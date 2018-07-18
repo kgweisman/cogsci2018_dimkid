@@ -1,0 +1,793 @@
+---
+title: "Folk philosophy of mind: Changes in conceptual structure between 4-9y of age"
+bibliography: library.bib
+csl: apa6.csl
+document-params: "10pt, letterpaper"
+
+author-information: > 
+    \author{{\large \bf Kara Weisman} \\ \texttt{kweisman@stanford.edu} \\ Department of Psychology \\ Stanford University
+    \And {\large \bf Carol S. Dweck} \\ \texttt{dweck@stanford.edu} \\ Department of Psychology \\ Stanford University
+    \And {\large \bf Ellen M. Markman} \\ \texttt{markman@stanford.edu} \\ Department of Psychology \\ Stanford University}
+
+abstract: 
+    "We explored children's developing understanding of mental life using a novel approach to track changes in conceptual structure from the bottom up by analyzing patterns of mental capacity attributions. US children (_n_=247) evaluated elephants, goats, mice, birds, beetles, teddy bears, dolls, robots, and computers on a range of mental capacities, allowing us to assess which attributions “go together” and how these conceptual connections might develop over early and middle childhood. Replicating previous studies with adults and older children, an exploratory factor analysis of older children's (7-9y) responses revealed a three-way distinction between physiological abilities (e.g., hunger, smell), social-emotional abilities (e.g., guilt, embarrassment), and perceptual-cognitive abilities (e.g., choice, memory), corresponding to traditional notions of BODY, HEART, and MIND. Hints of this three-way distinction emerged among younger children (4-6y), but younger children appeared to perceive markedly stronger connections among physiological and social-emotional abilities, while clearly distinguishing both from the MIND."
+    
+keywords:
+    "mind perception; conceptual change; lay biology; lay psychology; cognitive development."
+    
+output: cogsci2016::cogsci_paper
+---
+
+```{r global_options, include=FALSE}
+rm(list=ls())
+knitr::opts_chunk$set(fig.width=3, fig.height=3, fig.crop = F, fig.pos = "tb", fig.path='figs/', echo=F, warning=F, cache=F, message=F, sanitize = T)
+```
+
+```{r libraries}
+# load required packages
+library(png)
+library(grid)
+library(xtable)
+library(tidyverse)
+library(lubridate)
+library(psych)
+library(rms)
+```
+
+```{r functions}
+# round to exactly 2 decimal places
+round2 <- function(x) {format(round(x, 2), nsmall = 2)}
+
+# determine how many factors meet custom retention criteria
+retain_nfactors <- function(df_efa, n_var = 20, 
+                       chosen_cor = "cor", chosen_rot = "oblimin") {
+  
+  # make function for determining max factors to extract (based on df)
+  max_fact_fun <- function(p) {
+    
+    s_moments <- function(p) {p*(p+1)/2}
+    param_est <- function(p, k) {p*k + p - (k*(k-1)/2)}
+    check_ok <- function(p, k) {
+      a <- (p-k)^2
+      b <- p+k
+      return(ifelse(a>b, TRUE, FALSE))
+    }
+    
+    df_check <- data.frame()
+    for(i in 1:p){
+      df_check[i,"check"] <- check_ok(p,i)
+    }
+    
+    max <- df_check %>% filter(check) %>% nrow()
+    return(max)
+    
+  }
+  
+  # do maximal efa
+  nfact_max <- max_fact_fun(n_var)
+  efa_max_unrot <- psych::fa(df_efa, nfactors = nfact_max, 
+                             cor = chosen_cor, rotate = "none")
+  
+  # keep factors with eigenvalues > 1, proportion var explained > 5%
+  nfact_keep_mid <- efa_max_unrot$Vaccounted %>%
+    t() %>%
+    data.frame() %>%
+    rownames_to_column("factor") %>%
+    filter(SS.loadings > 1, Proportion.Explained > 0.05) %>%
+    nrow()
+  
+  # do efa with nfact_keep_mid factors + rotation
+  efa_mid_rot <- psych::fa(df_efa, nfactors = nfact_keep_mid, 
+                           cor = chosen_cor, rotate = chosen_rot)
+  
+  # keep factors that are dominant for >= 1 item
+  nfact_keep_final <- efa_mid_rot$loadings[] %>%
+    data.frame() %>%
+    rownames_to_column("capacity") %>%
+    gather(factor, loading, -capacity) %>%
+    group_by(capacity) %>%
+    top_n(1, abs(loading)) %>%
+    ungroup() %>%
+    count(factor) %>%
+    nrow()
+  
+  return(nfact_keep_final)
+  
+}
+
+# print top n dominant items by factor
+top_n_domCap <- function(loadings_df, n, factor){
+  dom_df <- loadings_df %>%
+    full_join(d_all %>% distinct(capacity, capWording)) %>%
+    gather(factor, loading, -capacity, -capWording) %>%
+    group_by(capacity, capWording) %>%
+    top_n(1, abs(loading)) %>%
+    ungroup() %>%
+    group_by(factor) %>%
+    top_n(n, abs(loading))
+  
+  wordings <- dom_df$capWording[dom_df$factor == factor] %>% 
+    paste(collapse = ", ")
+  
+  return(wordings)
+  
+}
+```
+
+```{r choices}
+# what correlation to use
+chosen_cor <- "cor" # reported in paper
+# chosen_cor <- "poly" # alternative option
+
+# what rotation to use
+chosen_rot <- "oblimin" # reported in paper
+# chosen_rot <- "varimax" # alternative option
+
+# number of iterations for efa
+n_iter <- 10
+# n_iter <- 5000
+```
+
+
+```{r load data, warning=FALSE}
+# older children (7-9y)
+d_raw_old <- read.csv("/Users/kweisman/Documents/Research (Stanford)/Projects/Dimkid/dimkid/data/children/run-02_2017-08-08_anonymized.csv") %>%
+  mutate(age_group = "children_79") %>%
+  select(-X, -trial.comments, -trialComments, -sessionComments)
+
+# younger children (4-6y)
+d_raw_young <- read.csv("/Users/kweisman/Documents/Research (Stanford)/Projects/Dimkid/dimkid/data/children/run-03_2017-08-21_anonymized.csv") %>%
+  mutate(age_group = "children_46") %>%
+  select(-X, -trial.comments, -trialComments, -sessionComments)
+
+d_raw <- d_raw_old %>% 
+  full_join(d_raw_young) %>%
+  mutate(dob = parse_datetime(dateOfBirth, "%m/%d/%y"),
+         dot = parse_datetime(gsub("2017", "17", dateOfTest), "%m/%d/%y"), 
+         age = interval(start = dob, end = dot) / 
+           duration(num = 1, units = "years")) %>%
+  select(-dateOfBirth, -dateOfTest, -dob, -dot)
+```
+
+```{r tidy data, warning=FALSE}
+# implement filters
+d0 <- d_raw %>%
+  filter(trialNum <= 20) %>%
+  mutate(response = tolower(response),
+         age_group = ifelse(is.na(age), age_group, # re-sort as needed
+                            ifelse(age < 7, "children_46", "children_79"))) %>%
+  filter((age >= 4 & age < 10) | is.na(age), # outside of age range
+         (rt >= 250 | is.na(rt)), # fast RTs
+         response %in% c("no", "kinda", "yes")) # skipped trials
+
+# recode variables
+d1 <- d0 %>%
+  mutate(capWording = gsub(" $", "", capWording),
+         capWording = gsub(" -- ", "--", capWording),
+         capacity = recode(capWording,
+                           "be aware of things" = "awareness",
+                           "feel embarrassed" = "embarrassment",
+                           "feel guilty" = "guilt",
+                           "feel happy" = "happiness",
+                           "feel love" = "love",
+                           "feel pain" = "pain",
+                           "feel proud" = "pride",
+                           "feel sad" = "sadness",
+                           "feel scared" = "fear",
+                           "feel sick--like when you feel like you might throw up" = "nausea",
+                           "feel tired" = "fatigue",
+                           "figure out how to do things" = "figuring_out",
+                           "get angry" = "anger",
+                           "get hungry" = "hunger",
+                           "get hurt feelings" = "hurt_feelings",
+                           "make choices" = "choice",
+                           "remember things" = "memory",
+                           "sense temperatures" = "temperature",
+                           "sense whether something is close by or far away" = "depth",
+                           "smell things" = "smell"),
+         responseNum = recode(response, "no" = 0, "kinda" = 0.5, "yes" = 1),
+         character = factor(character,
+                            levels = c("elephant", "goat", "mouse", "bird",
+                                       "beetle", "teddy_bear", "doll",
+                                       "robot", "computer")),
+         testingSite = tolower(testingSite),
+         testingSiteType = recode(testingSite,
+                                  "bing" = "preschool",
+                                  "jmz" = "museum",
+                                  "tech" = "museum")) %>%
+  distinct()
+
+# separate by age group
+d_all <- d1
+d_old <- d1 %>% filter(age_group == "children_79")
+d_young <- d1 %>% filter(age_group == "children_46")
+
+# make wideform versions for EFA
+d_old_wide <- d_old %>%
+  distinct(subid, capacity, responseNum) %>%
+  spread(capacity, responseNum) %>%
+  remove_rownames() %>%
+  column_to_rownames("subid")
+
+d_young_wide <- d_young %>%
+  distinct(subid, capacity, responseNum) %>%
+  spread(capacity, responseNum) %>%
+  remove_rownames() %>%
+  column_to_rownames("subid")
+
+# rm(d_raw, d_raw_old, d_raw_young, d0, d1)
+```
+
+```{r participants}
+# n
+n_total <- data.frame(d_all %>% distinct(subid) %>% count())$n
+n_old <- data.frame(d_old %>% distinct(subid) %>% count())$n
+n_young <- data.frame(d_young %>% distinct(subid) %>% count())$n
+
+# age
+age_median_old <- median(d_old$age, na.rm = T)
+age_min_old <- min(d_old$age, na.rm = T)
+age_max_old <- max(d_old$age, na.rm = T)
+age_median_young <- median(d_young$age, na.rm = T)
+age_min_young <- min(d_young$age, na.rm = T)
+age_max_young <- max(d_young$age, na.rm = T)
+
+# study duration
+duration_median_old <- median(d_old$sessionDuration, na.rm = T)
+duration_median_young <- median(d_young$sessionDuration, na.rm = T)
+
+# site
+site_df <- d_all %>%
+  distinct(age_group, subid, testingSiteType) %>%
+  count(age_group, testingSiteType) %>%
+  group_by(age_group) %>%
+  mutate(prop = n/sum(n)) %>%
+  data.frame()
+
+# character
+character_df <- d_all %>%
+  distinct(age_group, subid, character) %>%
+  count(age_group, character) %>%
+  data.frame()
+
+# rt < 250ms
+rt_df <- d_raw %>%
+  distinct(age_group, subid, trialNum, rt) %>%
+  mutate(rt_fast = ifelse(is.na(rt), "ok", ifelse(rt < 250, "fast", "ok")),
+         rt_fast = factor(rt_fast, levels = c("ok", "fast"))) %>%
+  count(age_group, rt_fast) %>%
+  complete(rt_fast, nesting(age_group), fill = list(n = 0)) %>%
+  data.frame()
+
+# skipped trials
+skip_df <- d_all %>%
+  complete(capacity, nesting(subid, age_group), 
+           fill = list(response = "SKIP")) %>%
+  distinct(age_group, subid, capacity, response) %>%
+  mutate(response = factor(response,
+                           levels = c("no", "kinda", "yes", "SKIP"))) %>%
+  count(age_group, response) %>% 
+  group_by(age_group) %>%
+  mutate(prop = n/sum(n)) %>%
+  data.frame()
+```
+
+```{r efa old, warning=FALSE}
+# determine how many factors to extract
+nfactors_old <- retain_nfactors(df_efa = d_old_wide)
+
+# alternative factor retention methods: uncomment to run
+# fa.parallel(d_old_wide, fa = "fa", n.iter = n_iter)
+# VSS(d_old_wide)
+
+# do EFA
+efa_old <- psych::fa(d_old_wide, nfactors = nfactors_old, n.iter = n_iter,
+                     cor = chosen_cor, rot = chosen_rot) %>% fa.sort()
+colnames(efa_old$loadings) <- paste("factor", 1:nfactors_old, sep = "")
+
+# get useful info from EFA
+efa_old_loadings <- efa_old$loadings[] %>% 
+  data.frame() %>%
+  rownames_to_column("capacity")
+
+efa_old_variance <- efa_old$Vaccounted %>% 
+  t() %>%
+  data.frame() %>%
+  mutate(factor = paste("factor", 1:nfactors_old, sep = ""))
+
+# efa_old_correlations <- efa_old$score.cor %>%
+#   data.frame() %>%
+#   rename(factor1 = X1, factor2 = X2, factor3 = X3) %>%
+#   mutate(factorA = paste("factor", 1:nfactors_old, sep = "")) %>%
+#   gather(factorB, cor, -factorA)
+```
+
+```{r efa young, warning=FALSE}
+# determine how many factors to extract
+nfactors_young <- retain_nfactors(df_efa = d_young_wide)
+
+# alternative factor retention methods: uncomment to run
+# fa.parallel(d_young_wide, fa = "fa", n.iter = n_iter)
+# VSS(d_young_wide)
+
+# do EFA
+efa_young <- psych::fa(d_young_wide, nfactors = nfactors_young, n.iter = n_iter,
+                     cor = chosen_cor, rot = chosen_rot) %>% fa.sort()
+colnames(efa_young$loadings) <- paste("factor", 1:nfactors_young, sep = "")
+
+# get useful info from EFA
+efa_young_loadings <- efa_young$loadings[] %>% 
+  data.frame() %>%
+  rownames_to_column("capacity")
+
+efa_young_variance <- efa_young$Vaccounted %>% 
+  t() %>%
+  data.frame() %>%
+  mutate(factor = paste("factor", 1:nfactors_young, sep = ""))
+
+efa_young_correlations <- efa_young$score.cor %>%
+  data.frame()
+colnames(efa_young_correlations) <- paste("factor", 1:nfactors_young, sep = "")
+efa_young_correlations <- efa_young_correlations %>%
+  mutate(factorA = paste("factor", 1:nfactors_young, sep = "")) %>%
+  gather(factorB, cor, -factorA)
+
+# calculate congruence with older kids' factors
+efa_young_congruence <- factor.congruence(efa_old, efa_young) %>%
+  data.frame() %>%
+  rownames_to_column("old_factor") %>%
+  gather(young_factor, congruence, -old_factor)
+```
+
+```{r efa young force 2 factors, warning=FALSE}
+# do EFA, forcibly extracting 2 factors
+efa_young_force2 <- psych::fa(d_young_wide, nfactors = 2, n.iter = n_iter,
+                     cor = chosen_cor, rot = chosen_rot) %>% fa.sort()
+colnames(efa_young_force2$loadings) <- paste("factor", 1:2, sep = "")
+
+# get useful info from EFA
+efa_young_force2_loadings <- efa_young_force2$loadings[] %>% 
+  data.frame() %>%
+  rownames_to_column("capacity")
+
+efa_young_force2_variance <- efa_young_force2$Vaccounted %>% 
+  t() %>%
+  data.frame() %>%
+  mutate(factor = paste("factor", 1:2, sep = ""))
+
+efa_young_force2_correlations <- efa_young_force2$score.cor %>%
+  data.frame()
+colnames(efa_young_force2_correlations) <- paste("factor", 1:2, sep = "")
+efa_young_force2_correlations <- efa_young_force2_correlations %>%
+  mutate(factorA = paste("factor", 1:2, sep = "")) %>%
+  gather(factorB, cor, -factorA)
+
+# calculate congruence with older kids' factors
+efa_young_force2_congruence <- factor.congruence(efa_old, efa_young_force2) %>%
+  data.frame() %>%
+  rownames_to_column("old_factor") %>%
+  gather(young_force2_factor, congruence, -old_factor)
+```
+
+```{r figure1 prep}
+figure1_order <- efa_old_loadings %>% 
+  gather(factor, loading, -capacity) %>% 
+  group_by(capacity) %>% 
+  top_n(1, abs(loading)) %>% 
+  ungroup() %>% 
+  rownames_to_column("order") %>% 
+  mutate(order = as.numeric(order)) %>%
+  select(capacity, order)
+
+figure1_df <- efa_old_loadings %>% 
+  rename(old_BODY = factor1, old_HEART = factor2, old_MIND = factor3) %>%
+  full_join(efa_young_loadings %>%
+              rename(young_BODY = factor1, young_HEART = factor2, 
+                     young_MIND = factor3)) %>%
+  full_join(efa_young_force2_loadings %>%
+              rename(forced1 = factor1, forced2 = factor2)) %>%
+  gather(factor, loading, -capacity) %>%
+  mutate(factor = factor(factor,
+                         levels = c("old_BODY", "old_HEART", "old_MIND",
+                                    "young_BODY", "young_HEART", "young_MIND",
+                                    "forced1", "forced2"),
+                         labels = c("7-9y\n3-factors:\nBODY", 
+                                    "7-9y\n3-factors:\nHEART", 
+                                    "7-9y\n3-factors:\nMIND", 
+                                    "4-6y\n3-factors:\nBODY",
+                                    "4-6y\n3-factors:\nHEART",
+                                    "4-6y\n3-factors:\nMIND",
+                                    "4-6y\n2-factors:\nBODY-HEART",
+                                    "4-6y\n2-factors:\nMIND"))) %>%
+  full_join(d_all %>% distinct(capacity, capWording)) %>%
+  mutate(capWording = ifelse(grepl("feel sick", capWording), 
+                             "feel sick... throw up", capWording),
+         capWording = ifelse(grepl("far away", capWording), 
+                             "sense... far away", capWording),
+         capWording = ifelse(grepl("figure out", capWording), 
+                             "figure out...", capWording)) %>%
+  full_join(figure1_order)
+
+var_df <- efa_old_variance %>% 
+  mutate(factor = recode(factor,
+                         "factor1" = "7-9y\n3-factors:\nBODY",
+                         "factor2" = "7-9y\n3-factors:\nHEART",
+                         "factor3" = "7-9y\n3-factors:\nMIND")) %>% 
+  full_join(efa_young_variance %>% 
+              mutate(factor = recode(factor,
+                                     "factor1" = "4-6y\n3-factors:\nBODY",
+                                     "factor2" = "4-6y\n3-factors:\nHEART",
+                                     "factor3" = "4-6y\n3-factors:\nMIND"))) %>% 
+  full_join(efa_young_force2_variance %>% 
+              mutate(factor = recode(factor,
+                                     "factor1" = "4-6y\n2-factors:\nBODY-HEART",
+                                     "factor2" = "4-6y\n2-factors:\nMIND")))
+```
+
+```{r endorsements}
+df_factors <- efa_old_loadings %>%
+  gather(factor, loading, -capacity) %>%
+  group_by(capacity) %>%
+  top_n(1, abs(loading)) %>%
+  ungroup() %>%
+  group_by(factor) %>%
+  top_n(6, abs(loading)) %>%
+  ungroup() %>%
+  mutate(factor = recode(factor,
+                         "factor1" = "BODY",
+                         "factor2" = "HEART",
+                         "factor3" = "MIND"))
+
+df_endorsements <- d_all %>%
+  full_join(df_factors) %>%
+  filter(!is.na(factor)) %>%
+  group_by(age_group, subid, character, age, factor) %>%
+  mutate(endorse = recode(response,
+                          "no" = 0,
+                          "kinda" = 1,
+                          "yes" = 1)) %>%
+  summarise(total = sum(endorse, na.rm = T))
+
+df_endorsements_diff <- df_endorsements %>%
+  spread(factor, total) %>%
+  mutate(HEART_BODY = HEART - BODY,
+         MIND_BODY = MIND - BODY,
+         MIND_HEART = MIND - HEART) %>%
+  select(-c(BODY, HEART, MIND)) %>%
+  gather(comparison, diff, c(HEART_BODY, MIND_BODY, MIND_HEART)) %>%
+  mutate(comparison = factor(comparison,
+                             labels = c("BODY minus HEART",
+                                        "MIND minus BODY",
+                                        "MIND minus HEART")))
+```
+
+```{r table 1 prep}
+diff_tab <- df_endorsements_diff %>%
+  ungroup() %>%
+  # mutate(age_group = factor(age_group, labels = c("4-6y", "7-9y")),
+  #        comparison = gsub("minus", "-", comparison)) %>%
+  group_by(age_group, comparison) %>%
+  summarise(n = n(),
+            median = median(diff),
+            mean = mean(diff, na.rm = T),
+            variance = var(diff, na.rm = T),
+            skewness = psych::skew(diff),
+            kurtosis = psych::kurtosi(diff)) %>%
+  mutate_at(vars(mean, variance, skewness, kurtosis), funs(round2)) %>%
+  # mutate(comparison = factor(comparison,
+  #                            labels = c("BODY minus HEART", 
+  #                                       "BODY minus MIND", 
+  #                                       "MIND minus HEART"))) %>%
+  ungroup() %>% 
+  arrange(comparison, age_group) %>%
+  select(comparison, age_group, n, median, mean, variance, skewness, kurtosis) %>%
+  data.frame()
+```
+
+```{r Table 1 prep}
+# wilcoxon tests
+w1 <- wilcox.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "BODY minus HEART"))
+w2 <- wilcox.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "MIND minus BODY"))
+w3 <- wilcox.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "MIND minus HEART"))
+
+# welch's tests
+t1 <- t.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "BODY minus HEART"))
+t2 <- t.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "MIND minus BODY"))
+t3 <- t.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "MIND minus HEART"))
+
+# bartlett's tests
+ksq1 <- bartlett.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "BODY minus HEART"))
+ksq2 <- bartlett.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "MIND minus BODY"))
+ksq3 <- bartlett.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "MIND minus HEART"))
+
+difftests_tab <- data.frame(group = c("B-H", "M-B", "M-H"),
+                            W = c(w1$statistic, w2$statistic, w3$statistic),
+                            Wp = c(w1$p.value, w2$p.value, w3$p.value),
+                            t = c(t1$statistic, t2$statistic, t3$statistic),
+                            tp = c(t1$p.value, t2$p.value, t3$p.value),
+                            K2 = c(ksq1$statistic, ksq2$statistic, 
+                                   ksq3$statistic),
+                            K2p = c(ksq1$p.value, ksq2$p.value, 
+                                    ksq3$p.value)) %>%
+  mutate_at(vars(-group), funs(round2))
+
+names(difftests_tab) <- c("", "W", "p", "t", "p", "K^2", "p")
+```
+
+# Introduction
+
+From early in life, attributions of mental capacities govern our interactions with other beings and inform our judgments about their moral status. In order to understand, predict, and coordinate with others, we make inferences about their thoughts, feelings, and other aspects of mental life. 
+
+Developmental and cognitive psychologists have made great progress in understanding how people make sense of other minds by postulating distinct representations of such categories as “perceptions,” “beliefs,” “desires,” and “emotions.” These categories have been incredibly useful—but do they correspond to children's own developing understanding of the structure of mental life? 
+
+After all, mental life is extremely complex. Consider a few examples of the many dimensions that might organize this conceptual space: Some mental capacities are closely related to specific bodily organs (e.g., vision, hunger), and others less obviously so (e.g., belief); some are positively or negatively valenced (e.g., pain, happiness), and others more neutral or variable (e.g., smell, thought); some involve taking in information about the environment, while others involve storing, updating, or using that information to bring about changes in the external world; some are broadly similar across species, and others may be unique to humans. How do people of different ages conceive of the connections and distinctions among mental states, and how does this conceptual structure shape their understanding of the various humans, animals, and technologies in their world? 
+
+In recent studies, we have set out to derive this conceptual structure empirically, using an approach—exploratory factor analysis—that reveals the conceptual connections and distinctions underlying participants' responses from the bottom up. Inspired by Gray et al.'s (2007) work on the “dimensions of mind perception,” we first used this bottom-up approach to analyze patterns of mental capacity attributions among US adults. Across several studies, three suites of mental capacities consistently emerged: (1) A suite of capacities related to the BODY, including physiological sensations and self-initiated behaviors; (2) a suite of capacities related to the HEART, including social-emotional experiences and moral agency; and (3) a suite of capacities related to the MIND, including perceptual-cognitive abilities and goal pursuit (Weisman et al., 2017b). A further study with 7- to 9-year-old US children using an adapted version of this experimental paradigm suggested that this distinction between BODY, HEART, and MIND might be in place by middle childhood (Weisman et al., 2017a).
+
+Here we extend this approach down to preschool-age children to explore the earlier development of this conceptual system. The preschool years are considered to be a time of rapid conceptual change in the domain of lay psychology, as evidenced by dramatic shifts in children's abilities to take others' perspectives, represent false beliefs, and integrate representations of intentions and outcomes in evaluating moral responsibility (for reviews, see Flavell, 1999; Wellman, 2015). The period between 4-10y of age has also been the focus of a rich tradition of work on lay biology extending back nearly a century (e.g., Carey, 1985; Medin et al., 2010; Piaget, 1929). All of these accounts make the case that becoming a sophisticated reasoner—and particularly a sophisticated social reasoner—requires substantial refinement of one's representations of others' experiences, beliefs, desires, and needs. Might these refinements include shifts in children's intuitions about the fundamental components of mental life?
+
+In the current paper, we examine snapshots of this conceptual structure at two points in development (ages 4-6y and 7-9y) within a well-studied cultural context (the US). We aim to assess the similarities and differences in younger vs. older children's representations of sensations, perceptions, beliefs, thoughts, desires, emotions, and other aspects of mental life. This is the first step in developing a more nuanced account of how this core aspect of folk philosophy of mind might emerge and change over the course of early and middle childhood.
+
+# Study
+
+We based our experimental paradigm on our previous work with children ages 7-9y (Weisman et al., 2017a), in which children evaluated a target character on a variety of mental capacities using a 3-point response scale (_no_, _kinda_, _yes_). Although a 3-point scale is not optimal for factor analyses, it enabled children as young as 4y to answer questions comfortably and complete many trials. Including a wide age range while maintaining a within-subjects design was our top priority for the planned factor analyses.
+
+As in previous work with adults (Weisman et al., 2017b, Study 4), we asked each participant to judge the mental capacities of one target character out of a set of familiar entities. We included both animals and artifacts in this set, with an eye toward exploring age-related differences in the relationship between attributions of biological animacy and mental life (see, e.g., Carey, 1985; Gelman & Opfer, 2002). For animals, we included both mammals of different sizes and relationships to humans (elephant, goat, mouse) and non-mammals (bird, beetle), to represent a range of creatures that might vary in their perceived mental capacities. For artifacts, we included both anthropomorphic toys (teddy bear, doll) and “smart” technologies (robot, computer), which present different kinds of challenges in terms of grappling with the relationship between animacy, pretense, and mental life. Most critically for our bottom-up approach, we expected these target characters to be perceived as having very different mental lives: Robots, for example, are generally thought to have a different set of mental capacities than, say, goats (Weisman et al., 2017b).  This allowed us to address the following question: When different characters are thought to have different profiles of mental capacities, which capacities “go together”?
+
+## Methods
+
+### Participants
+
+`r n_total` children participated in this study, which took place in the San Francisco Bay Area. Our planned sample size was 120 older and 120 younger children, but we also retained a handful of extra participants who completed the study on the final day of data collection for each group. Older children (_n_=`r n_old`) ranged in age from `r round2(age_min_old)`-`r round2(age_max_old)`y (median: `r round2(age_median_old)`y), and participated at local museums; the median study duration for this group was `r round2(duration_median_old)`min. Younger children (_n_=`r n_young`) ranged in age from `r round2(age_min_young)`-`r round2(age_max_young)`y (median: `r round2(age_median_young)`y), and participated either at their preschool (`r round(site_df$prop[site_df$age_group == "children_46" & site_df$testingSiteType == "preschool"]*100)`%) or at a museum (`r round(site_df$prop[site_df$age_group == "children_46" & site_df$testingSiteType == "museum"]*100)`%); the median study duration for this group was `r round2(duration_median_young)`min. An additional 7 children participated but were excluded for being outside the target age range.
+
+We grouped children into two age groups because our primary planned analysis—exploratory factor analysis—is a group-level analysis of the consensual conceptual structure, and is not designed to model continuous participant-level variables like exact age. Our goal in this study was to examine discrete "snapshots" of this conceptual structure at two points in this continuous developmental trajectory.
+
+### Materials and procedure
+
+Participants were assigned to evaluate one of the following characters: elephant, goat, mouse, bird, beetle, teddy bear, doll, robot, computer (_n_=`r min(character_df$n)`-`r max(character_df$n)` per character, per age group). Participants were assigned to condition randomly, with two exceptions: The doll and teddy bear conditions were run last for older children (but included in the initial randomization scheme for younger children); and toward the end of data collection for each age group children were assigned to conditions that had the fewest participants. A vivid, high-resolution photo of the target character in a naturalistic context (e.g., a humanoid robot in an office) and a label (e.g., a robot) were displayed on a computer screen for the duration of the study. 
+
+Instructions were identical to previous work with children (Weisman et al., 2017a), focusing on the idea that we wanted to know what children thought (e.g.) “[robots] can do and can not do.” Children rated the target character on 20 mental capacities, presented in a random order for each participant. On each trial, children responded _no_, _kinda_, or _yes_ to the question “Do you think a [robot] can…?” The experimenter read the instructions and the first question out loud. Older children were then given the option of reading and responding to subsequent questions on their own using the experimenter's laptop, which some but not all participants opted to do. All younger children heard all questions read aloud by the experimenter and responded verbally.  
+
+The 20 mental capacities were a subset of the 40 items used in previous work with children (Weisman et al., 2017a), including physiological sensations, emotional experiences, perceptual abilities, cognitive skills, capacities related to autonomy or agency, and social abilities; see Figure 1. As in previous work, each mental capacity was associated with a short, preset definition. Children were encouraged at the beginning of the study to ask questions if they did not know what a word meant, in which case they were given these definitions.
+
+### Data preparation
+
+We scored responses of _no_ as 0, _kinda_ as 0.5, and _yes_ as 1. We planned to drop trials with response times that were faster than a preset criterion of 250ms, but there were none. We retained participants regardless of skipped trials (0 trials among older children, `r skip_df$n[skip_df$age_group == "children_46" & skip_df$response == "SKIP"]` trials among younger children). Overall, none of older children's trials and only `r round2(skip_df$prop[skip_df$age_group == "children_46" & skip_df$response == "SKIP"]*100)`% of younger children's trials were missing data.
+
+### Planned analyses
+
+Following previous work, we conducted exploratory factor analyses (EFA) to reveal the latent structure underlying participants' mental capacity attributions, collapsing across characters and using Pearson correlations to find minimum residual solutions. We first examined maximal (14-factor) solutions to determine how many factors to extract, using the following preset retention criteria (identical to Weisman et al., 2017a, 2017b): Each factor must have an eigenvalue >1.0 and individually account for >5% of the shared variance before rotation; and each must be the “dominant” factor (have the strongest absolute factor loading) for $\geq$ 1 mental capacity after rotation. We used an oblique rotation (oblimin) here because it allows us to examine correlations among factors; note, however, that constraining factors to be orthogonal (via varimax rotation) yielded very similar latent structures. We compared this factor retention approach to two common alternatives: parallel analysis, which compares the observed correlation structure to the correlation structure arising from random datasets of the same size; and minimizing the Bayesian Information Criterion (BIC), which is one method of optimizing both goodness of fit and parsimony.
+
+## Results and discussion
+
+We first assess the conceptual replication of our previous work with 7- to 9-year-old children by conducting EFA of older children's responses. We then examine this conceptual system at an earlier point in development via EFA of younger children's responses. Finally, we present a post-hoc analysis of individual children's endorsements of three categories of mental capacities: physiological, social-emotional, and perceptual-cognitive. This provides a more intuitive picture of the EFA results and sheds new light on how the co-occurrence of endorsements across these three categories might vary with age.
+
+### EFA: Older children (7-9y)
+
+EFA revealed `r nfactors_old` factors that met our retention criteria. Alternative approaches to factor retention—parallel analysis and minimizing BIC—also yielded 3 factors. See Figure 1 (columns 1-3) for the full results of this analysis. 
+
+After rotation, the first factor corresponded primarily to physiological sensations and other experiences related to biological needs and physical survival. It was the dominant factor for such items as _`r top_n_domCap(efa_old_loadings, 4, "factor1")`_. The second factor corresponded primarily to social-emotional experiences. It was the dominant factor for such items as _`r top_n_domCap(efa_old_loadings, 4, "factor2")`_. The third factor corresponded primarily to perceptual and cognitive abilities to detect, store, and make use of information about the environment. It was the dominant factor for such items as _`r top_n_domCap(efa_old_loadings, 4, "factor3")`_. 
+
+This provides a conceptual replication of our previous work with this age group, suggesting that this conceptual structure emerges not only when children are asked to reason about controversial “edge cases” (beetles and robots) and factors are constrained to be orthogonal (Weisman et al., 2017a), but also when children reason about a wider range of artifacts and animals and factors are allowed to correlate. In both cases, older children's mental capacity attributions revealed an adult-like distinction between physiological, social-emotional, and perceptual-cognitive abilities—resonating with traditional notions of BODY, HEART, and MIND, respectively (Weisman et al., 2017b).
+
+Beyond replicating previous findings, the use of an oblique rotation method also allowed us to examine the correlations among factor loadings for each factor—one way to probe the similarities and conceptual connections across these latent constructs. The BODY and HEART factors were somewhat more strongly correlated ($\phi$=`r round2(efa_old$cis$means.rot[1])`, bootstrapped 95% CI: [`r round2(efa_old$cis$ci.rot[1, "lower"])`, `r round2(efa_old$cis$ci.rot[1, "upper"])`]) than were BODY and MIND ($\phi$=`r round2(efa_old$cis$means.rot[2])` [`r round2(efa_old$cis$ci.rot[2, "lower"])`, `r round2(efa_old$cis$ci.rot[2, "upper"])`]) or HEART and MIND ($\phi$=`r round2(efa_old$cis$means.rot[3])` [`r round2(efa_old$cis$ci.rot[3, "lower"])`, `r round2(efa_old$cis$ci.rot[3, "upper"])`]). This hints at a possible conceptual connection that we were previously unaware of: Although physiological and social-emotional abilities seemed to emerge from distinct latent constructs in older children's reasoning, there may have been a privileged relationship between BODY and HEART.
+
+### EFA: Younger children (4-6y)
+
+Again, `r nfactors_young` factors met our preset retention criteria (Fig. 1, col. 4-6). After rotation, the first factor included both physiological sensations (BODY) and emotions (HEART): It was the dominant factor for such items as _`r top_n_domCap(efa_young_loadings, 4, "factor1")`_. The second factor primarily included emotions (HEART): It was the dominant factor for such items as _`r top_n_domCap(efa_young_loadings, 4, "factor2")`_. The third factor corresponded to perceptual-cognitive abilities (MIND): It was the dominant factor for such items as _`r gsub("sense whether.*away,", "sense whether something is close...,", top_n_domCap(efa_young_loadings, 4, "factor3"))`_. Again, the first and second factors were somewhat more strongly correlated ($\phi$=`r round2(efa_young$cis$means.rot[1])` [`r round2(efa_young$cis$ci.rot[1, "lower"])`, `r round2(efa_young$cis$ci.rot[1, "upper"])`]) than were first and third ($\phi$=`r round2(efa_young$cis$means.rot[2])` [`r round2(efa_young$cis$ci.rot[2, "lower"])`, `r round2(efa_young$cis$ci.rot[2, "upper"])`]) or the second and third ($\phi$=`r round2(efa_young$cis$means.rot[3])` [`r round2(efa_young$cis$ci.rot[3, "lower"])`, `r round2(efa_young$cis$ci.rot[3, "upper"])`]).
+
+Meanwhile, parallel analysis suggested a 2-factor solution (Fig. 1, col. 7-8). After rotation, the first factor included both physiological sensations (BODY) and emotions (HEART; e.g., _`r gsub("sick.*up,", "sick...,", top_n_domCap(efa_young_force2_loadings, 4, "factor1"))`_), while the second factor corresponded to perceptual-cognitive abilities (MIND; e.g., _`r gsub("sense whether.*away,", "sense whether something is close...,", top_n_domCap(efa_young_force2_loadings, 4, "factor2"))`_). The two factors were moderately correlated ($\phi$=`r round2(efa_young_force2$cis$means.rot[1])` [`r round2(efa_young_force2$cis$ci.rot[1, "lower"])`, `r round2(efa_young_force2$cis$ci.rot[1, "upper"])`]). 
+
+BIC was minimized by a 1-factor solution (not reported). 
+
+```{r figure1, fig.env = "figure*", fig.pos = "tb", fig.width=7, fig.height=4, fig.align = "center", set.cap.width=T, num.cols.cap=2, fig.cap = "Factor loadings from exploratory factor analyses. Items are ordered according to their dominant factor (the factor with the strongest factor loading) among older children (7-9y). The percent of shared variance explained by each factor (after factor retention and oblimin rotation) is listed at the bottom of each column."}
+ggplot(figure1_df,
+       aes(x = factor, y = reorder(capWording, desc(order)), fill = loading)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = round2(loading)), size = 3) +
+  annotate("rect", xmin = 0.5, xmax = 3.5, ymin = 0.5, ymax = 20.5,
+           color = "black", alpha = 0, size = 0.6) +
+  annotate("rect", xmin = 3.5, xmax = 6.5, ymin = 0.5, ymax = 20.5,
+           color = "black", alpha = 0, size = 0.6) +
+  annotate("rect", xmin = 6.5, xmax = 8.5, ymin = 0.5, ymax = 20.5,
+           color = "black", alpha = 0, size = 0.6) +
+  geom_text(data = var_df, size = 3,
+            aes(x = factor, y = 0, fill = NULL, 
+                label = paste0(round(Proportion.Explained, 2)*100, "%"))) +
+  geom_text(data = data.frame(factor = 1:8, 
+                              label = c("7-9y, 3-factor solution:", "", "",
+                                        "4-6y, 3-factor solution:", "", "",
+                                        "4-6y, 2-factor solution:", "")),
+            aes(x = factor - 0.5, y = 22, fill = NULL, label = label),
+            size = 3, hjust = 0) +
+  geom_text(data = data.frame(factor = 1:8, 
+                              label = c("BODY", "HEART", "MIND",
+                                        "BODY", "HEART", "MIND",
+                                        "BODY-HEART", "MIND")),
+            aes(x = factor, y = 21, fill = NULL, label = label),
+            size = 2.5, hjust = 0.5) +
+  scale_fill_distiller(palette = "RdYlBu", 
+                       limits = c(-1, 1), breaks = c(-1, 0, 1),
+                       guide = guide_colorbar(title = element_blank(),
+                                              barheight = 15, barwidth = 0.5)) +
+  scale_x_discrete(position = "top") +
+  expand_limits(y = c(-0.75, 22.5)) +
+  theme_minimal() +
+  labs(x = "Factor loadings from exploratory factor analyses (EFA)") +
+  theme(title = element_text(hjust = 0),
+        text = element_text(size = 10),
+        axis.text.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid = element_blank())
+```
+
+Taken together, these results suggest both similarities and differences relative to the conceptual structure that older children (7-9y) appeared to share with adults in previous work. 
+
+First, like older children, younger children's responses were characterized by strong correlations among a suite of perceptual and cognitive capacities that we have labeled MIND. Indeed, younger children's perceptual-cognitive factor was highly congruent with older children's MIND factor, both in the 3-factor solution (Tucker's _$r_c$_=`r round2(efa_young_congruence %>% filter(old_factor == "factor3", young_factor == "factor3") %>% select(congruence))`) and in the 2-factor solution (_$r_c$_=`r round2(efa_young_force2_congruence %>% filter(old_factor == "factor3", young_force2_factor == "factor2") %>% select(congruence))`). This highlights one aspect of the latent structure underlying younger children's responses that resonates with the intuitions of older children and adults.
+
+But in contrast to the clear distinction between physiological abilities and social-emotional abilities that characterized older children's mental capacity attributions, younger children's responses suggest that they perceived physiological and social-emotional abilities to be more closely integrated and the line between them to be more blurred.
+
+One indication of this blurring comes from the 2-factor solution suggested by parallel analysis, in which a single BODY-HEART factor emerged and was moderately congruent with both the BODY (_$r_c$_=`r round2(efa_young_force2_congruence %>% filter(old_factor == "factor1", young_force2_factor == "factor1") %>% select(congruence))`) and HEART (_$r_c$_=`r round2(efa_young_force2_congruence %>% filter(old_factor == "factor2", young_force2_factor == "factor1") %>% select(congruence))`) factors of older children. Among the mental capacities that loaded strongly ($\geq$ 0.60) on this factor were both physiological sensations (_get hungry, feel sick..., smell things_) and social-emotional experiences (_feel happy, feel sad, feel proud, get angry, feel love, get hurt feelings_), suggesting that younger children perceived physiological and social-emotional abilities to "go together" to a considerable degree.
+
+Even in the 3-factor solution suggested by our standard factor retention protocol, the distinction between physiological and social-emotional abilities was somewhat blurred. While the first factor was highly congruent with older children's BODY factor (_$r_c$_=`r round2(efa_young_congruence %>% filter(old_factor == "factor1", young_factor == "factor1") %>% select(congruence))`), it was also the dominant factor for several social-emotional items (_get angry, get hurt feelings, feel sad_). And while the second factor was highly congruent with older children's HEART factor (_$r_c$_=`r round2(efa_young_congruence %>% filter(old_factor == "factor2", young_factor == "factor2") %>% select(congruence))`), there were several social-emotional items that failed to load strongly on it (loadings $\leq$ 0.30: _get angry, get hurt feelings, feel sad, feel guilty_). Stepping back, it is not clear that “physiological vs. social-emotional” is the best way to characterize the differences between these two factors. In fact, given that the strongest-loading items for the first factor were negatively valenced (_`r top_n_domCap(efa_young_loadings, 3, "factor1")`_) while the strongest-loading items for the second factor were positively valenced (_`r top_n_domCap(efa_young_loadings, 3, "factor2")`_), it seems plausible that the more salient distinction among this age group may have been positive vs. negative valence, rather than BODY vs. HEART. This is in line with recent work suggesting that valence is a particularly important feature of emotion concept representations for young children (Nook et al., 2017).
+
+Finally, the very fact that different approaches to factor retention yielded different results is further evidence that, although we observed some evidence for a nascent distinction between BODY and HEART among younger children, this distinction was not as robust as it appeared to be among older children or among adults in previous work.
+
+### Exploratory analysis: Differentiation at the participant level
+
+How might age-related differences in conceptual structure manifest in individual children's mental capacity attributions? We now present an exploratory analysis of the differentiation of BODY, HEART, and MIND categories by individual children—a kind of non-parametric, participant-level analysis meant to parallel the EFAs reported above.
+
+We based this analysis on the intuition that a child who differentiates clearly between two categories (e.g., BODY vs. HEART) will evaluate mental capacities related to these categories somewhat independently. Such a child will sometimes end up endorsing mental capacities in one category while rejecting mental capacities in the other (e.g., endorsing most BODY items but rejecting most HEART items)—whereas a child who does not differentiate between these categories might be more likely to endorse or reject across the board (e.g., endorsing equal numbers of BODY and HEART items). Of course, depending on the target character they happen to evaluate, even children with clearly differentiated categories might end up endorsing equal numbers of capacities in both.  But if the differentiation of two categories becomes stronger over development, we might expect that, on average, the difference in the number of endorsements between these categories would be greater for older than younger children.
+
+With these intuitions in mind, we used older children's EFA results to choose sets of mental capacities to represent the categories BODY, HEART, and MIND. For each category, we included only items that (1) loaded more strongly on that factor than on others and (2) were among the 6 strongest-loading items for that factor.\footnote{Two items, \textit{feel happy} and \textit{get angry}, were dropped from this analysis, because they were not in the top 6 items for any factor.}  We tallied the number of “endorsements” (responses of _yes_ or _kinda_) for the items in each category; each child could endorse 0-6 capacities for each category. We then examined differences in the number of endorsements between each pair of categories: HEART minus BODY, MIND minus BODY, and MIND minus HEART. Distributions of differences in endorsements across pairs of categories for each age group are presented in Figure 2, with comparisons of variances and central tendencies in Table 1. 
+
+```{r figure2, fig.env = "figure", fig.pos = "tb", fig.width=3.25, fig.height = 4.5, fig.align = "top", set.cap.width=T, num.cols.cap=1, fig.cap = "Distributions of between-category differences in how many capacities each child, by age group."}
+ggplot(df_endorsements_diff,
+       aes(x = diff, fill = age_group, color = age_group)) +
+  facet_wrap(~ comparison, ncol = 1) +
+  geom_bar(position = position_identity(), alpha = 0.5, size = 0.2) +
+  geom_vline(xintercept = 0, lty = 2) +
+  annotate("text", x = -10, y = 60, label = "4-6y (n=123):", color = "#7b3294",
+           size = 2.5, hjust = 0, vjust = 1, fontface = "bold") +
+  annotate("text", x = 5, y = 60, label = "7-9y (n=124):", color = "#008837",
+           size = 2.5, hjust = 0, vjust = 1, fontface = "bold") +
+  geom_text(data = diff_tab %>% filter(age_group == "children_46"), 
+            aes(x = -10, y = 60, 
+                label = paste0("\n- median: ", median,
+                               "\n- mean: ", mean,
+                               "\n- variance: ", variance,
+                               "\n- skewness: ", skewness,
+                               "\n- kurtosis: ", kurtosis)), 
+            size = 2.5, hjust = 0, vjust = 1, show.legend = FALSE) +
+  geom_text(data = diff_tab %>% filter(age_group == "children_79"), 
+            aes(x = 5, y = 60, 
+                label = paste0("\n- median: ", median,
+                               "\n- mean: ", mean,
+                               "\n- variance: ", variance,
+                               "\n- skewness: ", skewness,
+                               "\n- kurtosis: ", kurtosis)), 
+            size = 2.5, hjust = 0, vjust = 1, show.legend = FALSE) +
+  scale_x_continuous("Difference between categories", 
+                     limits = c(-10, 10), breaks = seq(-6, 6, 2)) +
+  scale_y_continuous("Number of participants", breaks = seq(0, 100, 10)) +
+  scale_fill_manual("Age group",
+                    values = c("#af8dc3", "#7fbf7b"),
+                    labels = c("4-6y", "7-9y")) +
+  scale_color_manual("Age group", 
+                     values = c("#7b3294", "#008837"),
+                     labels = c("4-6y", "7-9y")) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        text = element_text(size = 9),
+        # panel.border = element_rect(fill = NA),
+        panel.grid.minor = element_blank())
+```
+
+First we consider the differentiation of HEART vs. BODY. Echoing the contrast in factor structure revealed by EFA—in which HEART and BODY were distinct factors among older children but seemed more integrated among younger children—older children seem to have been more likely to differentiate strongly between these categories in their mental capacity endorsements, as illustrated by the greater number of older children with difference scores $\gg$ 0 or $\ll$ 0 (Fig. 2, top). In line with this, the variance of younger children's difference scores was lower than the variance of older children's difference scores (see Table 1). 
+
+Next, we consider MIND vs. BODY. Recall that MIND was identified as a latent construct distinct from BODY and HEART in EFAs for both age groups. Echoing this, children in both age groups differentiated between these categories, as illustrated by the many participants with difference scores $\gg$ 0 or $\ll$ 0 (Fig. 2, middle). However, these distributions of difference scores differed in their central tendency (Table 1): Younger children tended to attribute more BODY than MIND capacities, while older children tended to attribute more MIND than BODY capacities.
+
+Finally, we consider HEART vs. MIND. Again, many children in both age groups differentiated between these categories (Fig. 2, bottom). In this case, however, older children were especially likely to have extreme difference scores, as reflected by the difference in variance between age groups (Table 1). These distributions also differed in their central tendency: Younger children tended to attribute more HEART than MIND capacities, while older children tended to attribute more MIND than HEART capacities.
+
+```{r table1, results="asis"}
+tab1 <- xtable::xtable(difftests_tab,
+                       align = "ll|rr|rr|rr",
+                       caption = "Mann-Whitney-Wilcoxon ($\t{W}$) and Welch's ($\t{t}$) tests for comparing central tendencies and Bartlett's tests ($\t{K^2}$) for comparing variances in difference scores across age groups.")
+
+print(tab1, type="latex", include.rownames = F, comment = F)
+```
+
+```{r figure3, fig.env = "figure", fig.pos = "tb", fig.width=7, fig.height = 4, fig.align = "top", set.cap.width=T, num.cols.cap=1, fig.cap = "Distributions of between-category differences in how many capacities each child, by age group.", include = F}
+efa_old_loadings %>%
+  gather(factor, loading, -capacity) %>%
+  group_by(capacity) %>%
+  top_n(1, abs(loading)) %>%
+  ungroup() %>%
+  arrange(factor, desc(abs(loading))) %>%
+  rownames_to_column("order") %>%
+  mutate(order = as.numeric(order)) %>%
+  select(-loading) %>%
+  full_join(d_all) %>%
+  group_by(age_group, character, factor, capacity, order) %>%
+  do(data.frame(rbind(smean.cl.boot(.$responseNum)))) %>%
+  ungroup() %>%
+  mutate(character = factor(gsub("_", " ", character),
+                            levels = c("doll", "teddy bear", "robot", 
+                                       "computer", "beetle", "bird", 
+                                       "mouse", "goat", "elephant"))) %>%
+  ggplot(aes(y = Mean, x = reorder(gsub("_", " ", capacity), order),
+             color = factor, alpha = age_group, shape = age_group)) +
+  facet_wrap(~ character, ncol = 3) +
+  geom_pointrange(aes(ymin = Lower, ymax = Upper),
+                  position = position_dodge(width = 0.8)) +
+  scale_x_discrete("") +
+  scale_y_continuous("Mean response", 
+                     breaks = c(0, 0.5, 1), 
+                     labels = c("0 (no)", "0.5 (kinda)", "1 (yes)")) +
+  scale_color_brewer("Factor", palette = "Set1", 
+                     labels = c("BODY", "HEART", "MIND")) +
+  scale_alpha_discrete("Age group", range = c(1, 0.5),
+                       labels = c("4-6y", "7-9y")) +
+  scale_shape_discrete("Age group", labels = c("4-6y", "7-9y")) +
+  theme_minimal() +
+  theme(panel.border = element_rect(fill = NA),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        legend.position = "bottom")
+```
+
+
+# General discussion
+
+We set out to investigate the development of reasoning about mental life, with the goal of comparing the conceptual structures that underlie mental capacity attributions in early childhood (4-6y) vs. middle childhood (7-9y) in a well-studied cultural context (the US). To this end, we examined patterns in children's attributions of a wide range of mental capacities to various target characters.
+
+Two key findings emerged from this study. Both younger and older children treated perceptual-cognitive abilities (MIND) as a distinct component of mental life: Abilities to detect, store, and use information about the environment travelled together in their attributions, and were endorsed somewhat independently from physiological or social-emotional abilities. But while older children differentiated between physiological and social-emotional abilities as two additional, distinct components of mental life (BODY vs. HEART), among younger children this distinction was less clear and less robust. These two findings—the similarity in younger vs. older children's understanding of MIND and the difference in their understanding of BODY vs. HEART—emerged both in our planned comparison of the correlation structures underlying responses at the group level (via EFA) and in our exploratory analysis of differences in endorsements between categories at the individual level.
+
+Beyond this, this exploratory analysis surfaced two age-related differences that were not evident from EFA alone. 
+
+First, it revealed different biases in mental capacity attributions across the two age groups: While older children frequently endorsed MIND capacities in the absence of BODY or HEART capacities, younger children, if anything, showed the opposite bias, particularly in their endorsement of BODY capacities in the absence of MIND. This hints at the possibility that children of different ages might perceive different kinds of relationships among BODY, HEART, and MIND. 
+
+In particular, younger children's tendency to endorse BODY in the absence of MIND is consistent with the idea that the physiological abilities characteristic of biological animals are a necessary precondition for perceptual-cognitive abilities—but older children's endorsement patterns suggest that they might consider it possible for an entity to have social-emotional or perceptual-cognitive abilities in the absence of biological animacy. This is an issue of particular importance in the modern world, in which children are increasingly encountering “smart,” “social” technologies intended to convey cognitive prowess and social-emotional presence. Our results suggest that children of different ages might have different intuitions about the mental lives of technological beings, with older children (7-9y) being particularly open to the possibility of non-biological HEARTs and MINDs.
+
+Second, older children appear to have differentiated more strongly than younger children not only between HEART and BODY (as revealed by EFA), but also between HEART and MIND, suggesting that one of the important questions that children appear to be grappling with during this period in development is how to make sense of emotional experience in relation to the body and the mind. 
+
+While the category of “emotions” might seem natural to many readers, there is much debate among affective scientists and cultural psychologists about whether emotions are in fact a universal natural kind (e.g., Barrett, 2006; Russell, 1991; Wierzbicka, 1994). From the perspective of the BODY-HEART-MIND framework, emotional experiences frequently center on physiological sensations, such as an aching heart, a pit in the stomach, or flushed cheeks—but emotional life is also fundamentally cognitive, involving the perception, appraisal, and reframing of experiences in ways that reshape the experience itself (e.g., Gross, 2015). How does a person come to distinguish “emotions” from other physiological and cognitive processes? What kinds of personal experiences, social pressures, language demands, and cultural forces encourage US children to abstract away a third category of mental life, which seems to draw on both physiological and cognitive abilities while somehow constituting a third kind of “thing”? And what other categories of mental life might a person come to see if they grew up in a different context?
+
+The developmental and cultural origins of ordinary people's understanding of mental life are fascinating questions, deserving of further research. Two important next steps will be to move from the "snapshot" approach taken here to considering development more continuously, and to investigate how this aspect of folk philosophy of mind unfolds in contexts outside of the US, where both the developmental trajectory and the adult endpoint might be subject to different cultural forces from the ones at play here. The current study lays the foundation for such investigations.
+
+# Acknowledgements
+
+This material is based upon work supported by the NSF GRFP under Grant No. DGE-114747, and by a William R. & Sara Hart Kimball Stanford Graduate Fellowship. Thanks to C. Field, L.D. Brenner, O. Homer, C. Xie, J.N. Sullivan, L. Saylor, B. Radecki, A. Yu, A. Kelly; the Tech Museum of Innovation, the Palo Alto Junior Museum & Zoo, Bing Nursery School; and the families who participated in this research.
+
+# References 
+
+Barrett, L.F. (2006). Are emotions natural kinds? _Perspect Psychol Sci_, _1_(1), 28–58. 
+
+Carey, S. (1985). _Conceptual Change in Childhood_. Cambridge, MA: MIT Press.
+
+Flavell, J.H. (1999). Cognitive development: Children's knowledge about the mind. _Annu Rev Psychol_, _50_, 21–45. 
+
+Gelman, S., & Opfer, J. (2002). Development of the animate-inanimate distinction. In U. Goswami (Ed.), _Blackwell Handbook of Childhood Cognitive Development_ (pp. 151–166). Blackwell Publishers Ltd. 
+
+Gray, H.M., Gray, K., & Wegner, D.M. (2007). Dimensions of mind perception. _Science_, _315_(5812), 619. 
+
+Gross, J.J. (2015). Emotion regulation: Current status and future prospects. _Psychol Inq_, _26_(1), 1–26. 
+
+Medin, D., Waxman, S., Woodring, J., & Washinawatok, K. (2010). Human-centeredness is not a universal feature of young children's reasoning: Culture and experience matter when reasoning about biological entities. _Cog Dev_, _25_(3), 197–207. 
+
+Nook, E.C., Sasse, S.F., Lambert, H.K., McLaughlin, K.A., & Somerville, L.H. (2017). Increasing verbal knowledge mediates development of multidimensional emotion representations. _Nat Hum Behav_, _1_(12), 881–89. 
+
+Piaget, J. (1929). _The Child's Conception of the World_. London: Routledge & Kegan Paul Ltd.
+
+Russell, J.A. (1991). Culture and the categorization of emotions. _Psychol Bull_, _110_(3), 426–50. 
+
+Weisman, K., Dweck, C.S., & Markman, E.M. (2017a). Children's intuitions about the structure of mental life. In _Proc Annu Meeting Cog Sci Soc_ (pp. 1333–38).
+
+Weisman, K., Dweck, C.S., & Markman, E.M. (2017b). Rethinking people's conceptions of mental life. _Proc Natl Acad Sci_, _114_(43), 11374–79. 
+
+Wellman, H.M. (2015). _Making Minds: How Theory of Mind Develops_. New York, NY: Oxford University Press.
+
+Wierzbicka, A. (1994). Emotion, language, and cultural scripts. In _Emotion and culture: Empirical studies of mutual influence_. (pp. 133–96).
+
+\setlength{\parindent}{-0.1in} 
+\setlength{\leftskip}{0.125in}
+\noindent

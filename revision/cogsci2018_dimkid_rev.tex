@@ -1,0 +1,672 @@
+% Template for Cogsci submission with R Markdown
+
+% Stuff changed from original Markdown PLOS Template
+\documentclass[10pt, letterpaper]{article}
+
+\usepackage{cogsci}
+\usepackage{pslatex}
+\usepackage{float}
+\usepackage{caption}
+
+% amsmath package, useful for mathematical formulas
+\usepackage{amsmath}
+
+% amssymb package, useful for mathematical symbols
+\usepackage{amssymb}
+
+% hyperref package, useful for hyperlinks
+\usepackage{hyperref}
+
+% graphicx package, useful for including eps and pdf graphics
+% include graphics with the command \includegraphics
+\usepackage{graphicx}
+
+% Sweave(-like)
+\usepackage{fancyvrb}
+\DefineVerbatimEnvironment{Sinput}{Verbatim}{fontshape=sl}
+\DefineVerbatimEnvironment{Soutput}{Verbatim}{}
+\DefineVerbatimEnvironment{Scode}{Verbatim}{fontshape=sl}
+\newenvironment{Schunk}{}{}
+\DefineVerbatimEnvironment{Code}{Verbatim}{}
+\DefineVerbatimEnvironment{CodeInput}{Verbatim}{fontshape=sl}
+\DefineVerbatimEnvironment{CodeOutput}{Verbatim}{}
+\newenvironment{CodeChunk}{}{}
+
+% cite package, to clean up citations in the main text. Do not remove.
+\usepackage{cite}
+
+\usepackage{color}
+
+% Use doublespacing - comment out for single spacing
+%\usepackage{setspace}
+%\doublespacing
+
+
+% % Text layout
+% \topmargin 0.0cm
+% \oddsidemargin 0.5cm
+% \evensidemargin 0.5cm
+% \textwidth 16cm
+% \textheight 21cm
+
+\title{Folk philosophy of mind: Changes in conceptual structure between 4-9y of
+age}
+
+
+\author{{\large \bf Kara Weisman} \\ \texttt{kweisman@stanford.edu} \\ Department of Psychology \\ Stanford University \And {\large \bf Carol S. Dweck} \\ \texttt{dweck@stanford.edu} \\ Department of Psychology \\ Stanford University \And {\large \bf Ellen M. Markman} \\ \texttt{markman@stanford.edu} \\ Department of Psychology \\ Stanford University}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We explored children's developing understanding of mental life using a
+novel approach to track changes in conceptual structure from the bottom
+up by analyzing patterns of mental capacity attributions. US children
+(\emph{n}=247) evaluated elephants, goats, mice, birds, beetles, teddy
+bears, dolls, robots, and computers on a range of mental capacities,
+allowing us to assess which attributions ``go together'' and how these
+conceptual connections might develop over early and middle childhood.
+Replicating previous studies with adults and older children, an
+exploratory factor analysis of older children's (7-9y) responses
+revealed a three-way distinction between physiological abilities (e.g.,
+hunger, smell), social-emotional abilities (e.g., guilt, embarrassment),
+and perceptual-cognitive abilities (e.g., choice, memory), corresponding
+to traditional notions of BODY, HEART, and MIND. Hints of this three-way
+distinction emerged among younger children (4-6y), but younger children
+appeared to perceive markedly stronger connections among physiological
+and social-emotional abilities, while clearly distinguishing both from
+the MIND.
+
+\textbf{Keywords:}
+mind perception; conceptual change; lay biology; lay psychology;
+cognitive development.
+\end{abstract}
+
+\section{Introduction}\label{introduction}
+
+From early in life, attributions of mental capacities govern our
+interactions with other beings and inform our judgments about their
+moral status. In order to understand, predict, and coordinate with
+others, we make inferences about their thoughts, feelings, and other
+aspects of mental life.
+
+Developmental and cognitive psychologists have made great progress in
+understanding how people make sense of other minds by postulating
+distinct representations of such categories as ``perceptions,''
+``beliefs,'' ``desires,'' and ``emotions.'' These categories have been
+incredibly useful---but do they correspond to children's own developing
+understanding of the structure of mental life?
+
+After all, mental life is extremely complex. Consider a few examples of
+the many dimensions that might organize this conceptual space: Some
+mental capacities are closely related to specific bodily organs (e.g.,
+vision, hunger), and others less obviously so (e.g., belief); some are
+positively or negatively valenced (e.g., pain, happiness), and others
+more neutral or variable (e.g., smell, thought); some involve taking in
+information about the environment, while others involve storing,
+updating, or using that information to bring about changes in the
+external world; some are broadly similar across species, and others may
+be unique to humans. How do people of different ages conceive of the
+connections and distinctions among mental states, and how does this
+conceptual structure shape their understanding of the various humans,
+animals, and technologies in their world?
+
+In recent studies, we have set out to derive this conceptual structure
+empirically, using an approach---exploratory factor analysis---that
+reveals the conceptual connections and distinctions underlying
+participants' responses from the bottom up. Inspired by Gray et al.'s
+(2007) work on the ``dimensions of mind perception,'' we first used this
+bottom-up approach to analyze patterns of mental capacity attributions
+among US adults. Across several studies, three suites of mental
+capacities consistently emerged: (1) A suite of capacities related to
+the BODY, including physiological sensations and self-initiated
+behaviors; (2) a suite of capacities related to the HEART, including
+social-emotional experiences and moral agency; and (3) a suite of
+capacities related to the MIND, including perceptual-cognitive abilities
+and goal pursuit (Weisman et al., 2017b). A further study with 7- to
+9-year-old US children using an adapted version of this experimental
+paradigm suggested that this distinction between BODY, HEART, and MIND
+might be in place by middle childhood (Weisman et al., 2017a).
+
+Here we extend this approach down to preschool-age children to explore
+the earlier development of this conceptual system. The preschool years
+are considered to be a time of rapid conceptual change in the domain of
+lay psychology, as evidenced by dramatic shifts in children's abilities
+to take others' perspectives, represent false beliefs, and integrate
+representations of intentions and outcomes in evaluating moral
+responsibility (for reviews, see Flavell, 1999; Wellman, 2015). The
+period between 4-10y of age has also been the focus of a rich tradition
+of work on lay biology extending back nearly a century (e.g., Carey,
+1985; Medin et al., 2010; Piaget, 1929). All of these accounts make the
+case that becoming a sophisticated reasoner---and particularly a
+sophisticated social reasoner---requires substantial refinement of one's
+representations of others' experiences, beliefs, desires, and needs.
+Might these refinements include shifts in children's intuitions about
+the fundamental components of mental life?
+
+In the current paper, we examine snapshots of this conceptual structure
+at two points in development (ages 4-6y and 7-9y) within a well-studied
+cultural context (the US). We aim to assess the similarities and
+differences in younger vs.~older children's representations of
+sensations, perceptions, beliefs, thoughts, desires, emotions, and other
+aspects of mental life. This is the first step in developing a more
+nuanced account of how this core aspect of folk philosophy of mind might
+emerge and change over the course of early and middle childhood.
+
+\section{Study}\label{study}
+
+We based our experimental paradigm on our previous work with children
+ages 7-9y (Weisman et al., 2017a), in which children evaluated a target
+character on a variety of mental capacities using a 3-point response
+scale (\emph{no}, \emph{kinda}, \emph{yes}). Although a 3-point scale is
+not optimal for factor analyses, it enabled children as young as 4y to
+answer questions comfortably and complete many trials. Including a wide
+age range while maintaining a within-subjects design was our top
+priority for the planned factor analyses.
+
+As in previous work with adults (Weisman et al., 2017b, Study 4), we
+asked each participant to judge the mental capacities of one target
+character out of a set of familiar entities. We included both animals
+and artifacts in this set, with an eye toward exploring age-related
+differences in the relationship between attributions of biological
+animacy and mental life (see, e.g., Carey, 1985; Gelman \& Opfer, 2002).
+For animals, we included both mammals of different sizes and
+relationships to humans (elephant, goat, mouse) and non-mammals (bird,
+beetle), to represent a range of creatures that might vary in their
+perceived mental capacities. For artifacts, we included both
+anthropomorphic toys (teddy bear, doll) and ``smart'' technologies
+(robot, computer), which present different kinds of challenges in terms
+of grappling with the relationship between animacy, pretense, and mental
+life. Most critically for our bottom-up approach, we expected these
+target characters to be perceived as having very different mental lives:
+Robots, for example, are generally thought to have a different set of
+mental capacities than, say, goats (Weisman et al., 2017b). This allowed
+us to address the following question: When different characters are
+thought to have different profiles of mental capacities, which
+capacities ``go together''?
+
+\subsection{Methods}\label{methods}
+
+\subsubsection{Participants}\label{participants}
+
+247 children participated in this study, which took place in the San
+Francisco Bay Area. Our planned sample size was 120 older and 120
+younger children, but we also retained a handful of extra participants
+who completed the study on the final day of data collection for each
+group. Older children (\emph{n}=123) ranged in age from 7.09-9.99y
+(median: 8.57y), and participated at local museums; the median study
+duration for this group was 2.70min. Younger children (\emph{n}=124)
+ranged in age from 4.00-6.99y (median: 5.03y), and participated either
+at their preschool (68\%) or at a museum (32\%); the median study
+duration for this group was 3.58min. An additional 7 children
+participated but were excluded for being outside the target age range.
+
+We grouped children into two age groups because our primary planned
+analysis---exploratory factor analysis---is a group-level analysis of
+the consensual conceptual structure, and is not designed to model
+continuous participant-level variables like exact age. Our goal in this
+study was to examine discrete ``snapshots'' of this conceptual structure
+at two points in this continuous developmental trajectory.
+
+\subsubsection{Materials and procedure}\label{materials-and-procedure}
+
+Participants were assigned to evaluate one of the following characters:
+elephant, goat, mouse, bird, beetle, teddy bear, doll, robot, computer
+(\emph{n}=10-16 per character, per age group). Participants were
+assigned to condition randomly, with two exceptions: The doll and teddy
+bear conditions were run last for older children (but included in the
+initial randomization scheme for younger children); and toward the end
+of data collection for each age group children were assigned to
+conditions that had the fewest participants. A vivid, high-resolution
+photo of the target character in a naturalistic context (e.g., a
+humanoid robot in an office) and a label (e.g., a robot) were displayed
+on a computer screen for the duration of the study.
+
+Instructions were identical to previous work with children (Weisman et
+al., 2017a), focusing on the idea that we wanted to know what children
+thought (e.g.) ``{[}robots{]} can do and can not do.'' Children rated
+the target character on 20 mental capacities, presented in a random
+order for each participant. On each trial, children responded \emph{no},
+\emph{kinda}, or \emph{yes} to the question ``Do you think a {[}robot{]}
+can\ldots{}?'' The experimenter read the instructions and the first
+question out loud. Older children were then given the option of reading
+and responding to subsequent questions on their own using the
+experimenter's laptop, which some but not all participants opted to do.
+All younger children heard all questions read aloud by the experimenter
+and responded verbally.
+
+The 20 mental capacities were a subset of the 40 items used in previous
+work with children (Weisman et al., 2017a), including physiological
+sensations, emotional experiences, perceptual abilities, cognitive
+skills, capacities related to autonomy or agency, and social abilities;
+see Figure 1. As in previous work, each mental capacity was associated
+with a short, preset definition. Children were encouraged at the
+beginning of the study to ask questions if they did not know what a word
+meant, in which case they were given these definitions.
+
+\subsubsection{Data preparation}\label{data-preparation}
+
+We scored responses of \emph{no} as 0, \emph{kinda} as 0.5, and
+\emph{yes} as 1. We planned to drop trials with response times that were
+faster than a preset criterion of 250ms, but there were none. We
+retained participants regardless of skipped trials (0 trials among older
+children, 30 trials among younger children). Overall, none of older
+children's trials and only 1.21\% of younger children's trials were
+missing data.
+
+\subsubsection{Planned analyses}\label{planned-analyses}
+
+Following previous work, we conducted exploratory factor analyses (EFA)
+to reveal the latent structure underlying participants' mental capacity
+attributions, collapsing across characters and using Pearson
+correlations to find minimum residual solutions. We first examined
+maximal (14-factor) solutions to determine how many factors to extract,
+using the following preset retention criteria (identical to Weisman et
+al., 2017a, 2017b): Each factor must have an eigenvalue
+\textgreater{}1.0 and individually account for \textgreater{}5\% of the
+shared variance before rotation; and each must be the ``dominant''
+factor (have the strongest absolute factor loading) for \(\geq\) 1
+mental capacity after rotation. We used an oblique rotation (oblimin)
+here because it allows us to examine correlations among factors; note,
+however, that constraining factors to be orthogonal (via varimax
+rotation) yielded very similar latent structures. We compared this
+factor retention approach to two common alternatives: parallel analysis,
+which compares the observed correlation structure to the correlation
+structure arising from random datasets of the same size; and minimizing
+the Bayesian Information Criterion (BIC), which is one method of
+optimizing both goodness of fit and parsimony.
+
+\subsection{Results and discussion}\label{results-and-discussion}
+
+We first assess the conceptual replication of our previous work with 7-
+to 9-year-old children by conducting EFA of older children's responses.
+We then examine this conceptual system at an earlier point in
+development via EFA of younger children's responses. Finally, we present
+a post-hoc analysis of individual children's endorsements of three
+categories of mental capacities: physiological, social-emotional, and
+perceptual-cognitive. This provides a more intuitive picture of the EFA
+results and sheds new light on how the co-occurrence of endorsements
+across these three categories might vary with age.
+
+\subsubsection{EFA: Older children
+(7-9y)}\label{efa-older-children-7-9y}
+
+EFA revealed 3 factors that met our retention criteria. Alternative
+approaches to factor retention---parallel analysis and minimizing
+BIC---also yielded 3 factors. See Figure 1 (columns 1-3) for the full
+results of this analysis.
+
+After rotation, the first factor corresponded primarily to physiological
+sensations and other experiences related to biological needs and
+physical survival. It was the dominant factor for such items as
+\emph{get hungry, smell things, feel scared, feel pain}. The second
+factor corresponded primarily to social-emotional experiences. It was
+the dominant factor for such items as \emph{feel guilty, feel
+embarrassed, feel proud, get hurt feelings}. The third factor
+corresponded primarily to perceptual and cognitive abilities to detect,
+store, and make use of information about the environment. It was the
+dominant factor for such items as \emph{figure out how to do things,
+make choices, remember things, sense temperatures}.
+
+This provides a conceptual replication of our previous work with this
+age group, suggesting that this conceptual structure emerges not only
+when children are asked to reason about controversial ``edge cases''
+(beetles and robots) and factors are constrained to be orthogonal
+(Weisman et al., 2017a), but also when children reason about a wider
+range of artifacts and animals and factors are allowed to correlate. In
+both cases, older children's mental capacity attributions revealed an
+adult-like distinction between physiological, social-emotional, and
+perceptual-cognitive abilities---resonating with traditional notions of
+BODY, HEART, and MIND, respectively (Weisman et al., 2017b).
+
+Beyond replicating previous findings, the use of an oblique rotation
+method also allowed us to examine the correlations among factor loadings
+for each factor---one way to probe the similarities and conceptual
+connections across these latent constructs. The BODY and HEART factors
+were somewhat more strongly correlated (\(\phi\)=0.48, bootstrapped 95\%
+CI: {[}0.28, 0.67{]}) than were BODY and MIND (\(\phi\)=0.28 {[}0.10,
+0.47{]}) or HEART and MIND (\(\phi\)=0.23 {[}0.09, 0.37{]}). This hints
+at a possible conceptual connection that we were previously unaware of:
+Although physiological and social-emotional abilities seemed to emerge
+from distinct latent constructs in older children's reasoning, there may
+have been a privileged relationship between BODY and HEART.
+
+\subsubsection{EFA: Younger children
+(4-6y)}\label{efa-younger-children-4-6y}
+
+Again, 3 factors met our preset retention criteria (Fig. 1, col. 4-6).
+After rotation, the first factor included both physiological sensations
+(BODY) and emotions (HEART): It was the dominant factor for such items
+as \emph{get angry, get hungry, get hurt feelings, smell things}. The
+second factor primarily included emotions (HEART): It was the dominant
+factor for such items as \emph{feel happy, feel love, feel proud, feel
+scared}. The third factor corresponded to perceptual-cognitive abilities
+(MIND): It was the dominant factor for such items as \emph{sense
+temperatures, remember things, sense whether something is close\ldots{},
+feel guilty}. Again, the first and second factors were somewhat more
+strongly correlated (\(\phi\)=0.45 {[}0.35, 0.56{]}) than were first and
+third (\(\phi\)=0.34 {[}0.13, 0.55{]}) or the second and third
+(\(\phi\)=0.28 {[}0.07, 0.48{]}).
+
+Meanwhile, parallel analysis suggested a 2-factor solution (Fig. 1, col.
+7-8). After rotation, the first factor included both physiological
+sensations (BODY) and emotions (HEART; e.g., \emph{get hungry, feel
+sick\ldots{}, feel happy, feel sad}), while the second factor
+corresponded to perceptual-cognitive abilities (MIND; e.g., \emph{sense
+temperatures, remember things, sense whether something is close\ldots{},
+feel guilty}). The two factors were moderately correlated (\(\phi\)=0.52
+{[}0.40, 0.64{]}).
+
+BIC was minimized by a 1-factor solution (not reported).
+
+\begin{CodeChunk}
+\begin{figure*}[tb]
+
+{\centering \includegraphics{figs/figure1-1} 
+
+}
+
+\caption[Factor loadings from exploratory factor analyses]{Factor loadings from exploratory factor analyses. Items are ordered according to their dominant factor (the factor with the strongest factor loading) among older children (7-9y). The percent of shared variance explained by each factor (after factor retention and oblimin rotation) is listed at the bottom of each column.}\label{fig:figure1}
+\end{figure*}
+\end{CodeChunk}
+
+Taken together, these results suggest both similarities and differences
+relative to the conceptual structure that older children (7-9y) appeared
+to share with adults in previous work.
+
+First, like older children, younger children's responses were
+characterized by strong correlations among a suite of perceptual and
+cognitive capacities that we have labeled MIND. Indeed, younger
+children's perceptual-cognitive factor was highly congruent with older
+children's MIND factor, both in the 3-factor solution (Tucker's
+\emph{\(r_c\)}=0.81) and in the 2-factor solution (\emph{\(r_c\)}=0.79).
+This highlights one aspect of the latent structure underlying younger
+children's responses that resonates with the intuitions of older
+children and adults.
+
+But in contrast to the clear distinction between physiological abilities
+and social-emotional abilities that characterized older children's
+mental capacity attributions, younger children's responses suggest that
+they perceived physiological and social-emotional abilities to be more
+closely integrated and the line between them to be more blurred.
+
+One indication of this blurring comes from the 2-factor solution
+suggested by parallel analysis, in which a single BODY-HEART factor
+emerged and was moderately congruent with both the BODY
+(\emph{\(r_c\)}=0.75) and HEART (\emph{\(r_c\)}=0.68) factors of older
+children. Among the mental capacities that loaded strongly (\(\geq\)
+0.60) on this factor were both physiological sensations (\emph{get
+hungry, feel sick\ldots{}, smell things}) and social-emotional
+experiences (\emph{feel happy, feel sad, feel proud, get angry, feel
+love, get hurt feelings}), suggesting that younger children perceived
+physiological and social-emotional abilities to ``go together'' to a
+considerable degree.
+
+Even in the 3-factor solution suggested by our standard factor retention
+protocol, the distinction between physiological and social-emotional
+abilities was somewhat blurred. While the first factor was highly
+congruent with older children's BODY factor (\emph{\(r_c\)}=0.86), it
+was also the dominant factor for several social-emotional items
+(\emph{get angry, get hurt feelings, feel sad}). And while the second
+factor was highly congruent with older children's HEART factor
+(\emph{\(r_c\)}=0.82), there were several social-emotional items that
+failed to load strongly on it (loadings \(\leq\) 0.30: \emph{get angry,
+get hurt feelings, feel sad, feel guilty}). Stepping back, it is not
+clear that ``physiological vs.~social-emotional'' is the best way to
+characterize the differences between these two factors. In fact, given
+that the strongest-loading items for the first factor were negatively
+valenced (\emph{get angry, get hungry, get hurt feelings}) while the
+strongest-loading items for the second factor were positively valenced
+(\emph{feel happy, feel love, feel proud}), it seems plausible that the
+more salient distinction among this age group may have been positive
+vs.~negative valence, rather than BODY vs.~HEART. This is in line with
+recent work suggesting that valence is a particularly important feature
+of emotion concept representations for young children (Nook et al.,
+2017).
+
+Finally, the very fact that different approaches to factor retention
+yielded different results is further evidence that, although we observed
+some evidence for a nascent distinction between BODY and HEART among
+younger children, this distinction was not as robust as it appeared to
+be among older children or among adults in previous work.
+
+\subsubsection{Exploratory analysis: Differentiation at the participant
+level}\label{exploratory-analysis-differentiation-at-the-participant-level}
+
+How might age-related differences in conceptual structure manifest in
+individual children's mental capacity attributions? We now present an
+exploratory analysis of the differentiation of BODY, HEART, and MIND
+categories by individual children---a kind of non-parametric,
+participant-level analysis meant to parallel the EFAs reported above.
+
+We based this analysis on the intuition that a child who differentiates
+clearly between two categories (e.g., BODY vs.~HEART) will evaluate
+mental capacities related to these categories somewhat independently.
+Such a child will sometimes end up endorsing mental capacities in one
+category while rejecting mental capacities in the other (e.g., endorsing
+most BODY items but rejecting most HEART items)---whereas a child who
+does not differentiate between these categories might be more likely to
+endorse or reject across the board (e.g., endorsing equal numbers of
+BODY and HEART items). Of course, depending on the target character they
+happen to evaluate, even children with clearly differentiated categories
+might end up endorsing equal numbers of capacities in both. But if the
+differentiation of two categories becomes stronger over development, we
+might expect that, on average, the difference in the number of
+endorsements between these categories would be greater for older than
+younger children.
+
+With these intuitions in mind, we used older children's EFA results to
+choose sets of mental capacities to represent the categories BODY,
+HEART, and MIND. For each category, we included only items that (1)
+loaded more strongly on that factor than on others and (2) were among
+the 6 strongest-loading items for that
+factor.\footnote{Two items, \textit{feel happy} and \textit{get angry}, were dropped from this analysis, because they were not in the top 6 items for any factor.}
+We tallied the number of ``endorsements'' (responses of \emph{yes} or
+\emph{kinda}) for the items in each category; each child could endorse
+0-6 capacities for each category. We then examined differences in the
+number of endorsements between each pair of categories: HEART minus
+BODY, MIND minus BODY, and MIND minus HEART. Distributions of
+differences in endorsements across pairs of categories for each age
+group are presented in Figure 2, with comparisons of variances and
+central tendencies in Table 1.
+
+\begin{CodeChunk}
+\begin{figure}[tb]
+\includegraphics{figs/figure2-1} \caption[Distributions of between-category differences in how many capacities each child, by age group]{Distributions of between-category differences in how many capacities each child, by age group.}\label{fig:figure2}
+\end{figure}
+\end{CodeChunk}
+
+First we consider the differentiation of HEART vs.~BODY. Echoing the
+contrast in factor structure revealed by EFA---in which HEART and BODY
+were distinct factors among older children but seemed more integrated
+among younger children---older children seem to have been more likely to
+differentiate strongly between these categories in their mental capacity
+endorsements, as illustrated by the greater number of older children
+with difference scores \(\gg\) 0 or \(\ll\) 0 (Fig. 2, top). In line
+with this, the variance of younger children's difference scores was
+lower than the variance of older children's difference scores (see Table
+1).
+
+Next, we consider MIND vs.~BODY. Recall that MIND was identified as a
+latent construct distinct from BODY and HEART in EFAs for both age
+groups. Echoing this, children in both age groups differentiated between
+these categories, as illustrated by the many participants with
+difference scores \(\gg\) 0 or \(\ll\) 0 (Fig. 2, middle). However,
+these distributions of difference scores differed in their central
+tendency (Table 1): Younger children tended to attribute more BODY than
+MIND capacities, while older children tended to attribute more MIND than
+BODY capacities.
+
+Finally, we consider HEART vs.~MIND. Again, many children in both age
+groups differentiated between these categories (Fig. 2, bottom). In this
+case, however, older children were especially likely to have extreme
+difference scores, as reflected by the difference in variance between
+age groups (Table 1). These distributions also differed in their central
+tendency: Younger children tended to attribute more HEART than MIND
+capacities, while older children tended to attribute more MIND than
+HEART capacities.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{l|rr|rr|rr}
+  \hline
+ & W & p & t & p & K\verb|^|2 & p \\ 
+  \hline
+B-H & 8212.50 & 0.28 &  0.76 & 0.45 & 4.63 & 0.03 \\ 
+  M-B & 5805.50 & 0.00 & -3.48 & 0.00 & 1.21 & 0.27 \\ 
+  M-H & 5449.50 & 0.00 & -4.07 & 0.00 & 8.83 & 0.00 \\ 
+   \hline
+\end{tabular}
+\caption{Mann-Whitney-Wilcoxon ($   {W}$) and Welch's ($    {t}$) tests for comparing central tendencies and Bartlett's tests ($    {K^2}$) for comparing variances in difference scores across age groups.} 
+\end{table}
+
+\section{General discussion}\label{general-discussion}
+
+We set out to investigate the development of reasoning about mental
+life, with the goal of comparing the conceptual structures that underlie
+mental capacity attributions in early childhood (4-6y) vs.~middle
+childhood (7-9y) in a well-studied cultural context (the US). To this
+end, we examined patterns in children's attributions of a wide range of
+mental capacities to various target characters.
+
+Two key findings emerged from this study. Both younger and older
+children treated perceptual-cognitive abilities (MIND) as a distinct
+component of mental life: Abilities to detect, store, and use
+information about the environment travelled together in their
+attributions, and were endorsed somewhat independently from
+physiological or social-emotional abilities. But while older children
+differentiated between physiological and social-emotional abilities as
+two additional, distinct components of mental life (BODY vs.~HEART),
+among younger children this distinction was less clear and less robust.
+These two findings---the similarity in younger vs.~older children's
+understanding of MIND and the difference in their understanding of BODY
+vs.~HEART---emerged both in our planned comparison of the correlation
+structures underlying responses at the group level (via EFA) and in our
+exploratory analysis of differences in endorsements between categories
+at the individual level.
+
+Beyond this, this exploratory analysis surfaced two age-related
+differences that were not evident from EFA alone.
+
+First, it revealed different biases in mental capacity attributions
+across the two age groups: While older children frequently endorsed MIND
+capacities in the absence of BODY or HEART capacities, younger children,
+if anything, showed the opposite bias, particularly in their endorsement
+of BODY capacities in the absence of MIND. This hints at the possibility
+that children of different ages might perceive different kinds of
+relationships among BODY, HEART, and MIND.
+
+In particular, younger children's tendency to endorse BODY in the
+absence of MIND is consistent with the idea that the physiological
+abilities characteristic of biological animals are a necessary
+precondition for perceptual-cognitive abilities---but older children's
+endorsement patterns suggest that they might consider it possible for an
+entity to have social-emotional or perceptual-cognitive abilities in the
+absence of biological animacy. This is an issue of particular importance
+in the modern world, in which children are increasingly encountering
+``smart,'' ``social'' technologies intended to convey cognitive prowess
+and social-emotional presence. Our results suggest that children of
+different ages might have different intuitions about the mental lives of
+technological beings, with older children (7-9y) being particularly open
+to the possibility of non-biological HEARTs and MINDs.
+
+Second, older children appear to have differentiated more strongly than
+younger children not only between HEART and BODY (as revealed by EFA),
+but also between HEART and MIND, suggesting that one of the important
+questions that children appear to be grappling with during this period
+in development is how to make sense of emotional experience in relation
+to the body and the mind.
+
+While the category of ``emotions'' might seem natural to many readers,
+there is much debate among affective scientists and cultural
+psychologists about whether emotions are in fact a universal natural
+kind (e.g., Barrett, 2006; Russell, 1991; Wierzbicka, 1994). From the
+perspective of the BODY-HEART-MIND framework, emotional experiences
+frequently center on physiological sensations, such as an aching heart,
+a pit in the stomach, or flushed cheeks---but emotional life is also
+fundamentally cognitive, involving the perception, appraisal, and
+reframing of experiences in ways that reshape the experience itself
+(e.g., Gross, 2015). How does a person come to distinguish ``emotions''
+from other physiological and cognitive processes? What kinds of personal
+experiences, social pressures, language demands, and cultural forces
+encourage US children to abstract away a third category of mental life,
+which seems to draw on both physiological and cognitive abilities while
+somehow constituting a third kind of ``thing''? And what other
+categories of mental life might a person come to see if they grew up in
+a different context?
+
+The developmental and cultural origins of ordinary people's
+understanding of mental life are fascinating questions, deserving of
+further research. Two important next steps will be to move from the
+``snapshot'' approach taken here to considering development more
+continuously, and to investigate how this aspect of folk philosophy of
+mind unfolds in contexts outside of the US, where both the developmental
+trajectory and the adult endpoint might be subject to different cultural
+forces from the ones at play here. The current study lays the foundation
+for such investigations.
+
+\section{Acknowledgements}\label{acknowledgements}
+
+This material is based upon work supported by the NSF GRFP under Grant
+No. DGE-114747, and by a William R. \& Sara Hart Kimball Stanford
+Graduate Fellowship. Thanks to C. Field, L.D. Brenner, O. Homer, C. Xie,
+J.N. Sullivan, L. Saylor, B. Radecki, A. Yu, A. Kelly; the Tech Museum
+of Innovation, the Palo Alto Junior Museum \& Zoo, Bing Nursery School;
+and the families who participated in this research.
+
+\section{References}\label{references}
+
+Barrett, L.F. (2006). Are emotions natural kinds? \emph{Perspect Psychol
+Sci}, \emph{1}(1), 28--58.
+
+Carey, S. (1985). \emph{Conceptual Change in Childhood}. Cambridge, MA:
+MIT Press.
+
+Flavell, J.H. (1999). Cognitive development: Children's knowledge about
+the mind. \emph{Annu Rev Psychol}, \emph{50}, 21--45.
+
+Gelman, S., \& Opfer, J. (2002). Development of the animate-inanimate
+distinction. In U. Goswami (Ed.), \emph{Blackwell Handbook of Childhood
+Cognitive Development} (pp.~151--166). Blackwell Publishers Ltd.
+
+Gray, H.M., Gray, K., \& Wegner, D.M. (2007). Dimensions of mind
+perception. \emph{Science}, \emph{315}(5812), 619.
+
+Gross, J.J. (2015). Emotion regulation: Current status and future
+prospects. \emph{Psychol Inq}, \emph{26}(1), 1--26.
+
+Medin, D., Waxman, S., Woodring, J., \& Washinawatok, K. (2010).
+Human-centeredness is not a universal feature of young children's
+reasoning: Culture and experience matter when reasoning about biological
+entities. \emph{Cog Dev}, \emph{25}(3), 197--207.
+
+Nook, E.C., Sasse, S.F., Lambert, H.K., McLaughlin, K.A., \& Somerville,
+L.H. (2017). Increasing verbal knowledge mediates development of
+multidimensional emotion representations. \emph{Nat Hum Behav},
+\emph{1}(12), 881--89.
+
+Piaget, J. (1929). \emph{The Child's Conception of the World}. London:
+Routledge \& Kegan Paul Ltd.
+
+Russell, J.A. (1991). Culture and the categorization of emotions.
+\emph{Psychol Bull}, \emph{110}(3), 426--50.
+
+Weisman, K., Dweck, C.S., \& Markman, E.M. (2017a). Children's
+intuitions about the structure of mental life. In \emph{Proc Annu
+Meeting Cog Sci Soc} (pp.~1333--38).
+
+Weisman, K., Dweck, C.S., \& Markman, E.M. (2017b). Rethinking people's
+conceptions of mental life. \emph{Proc Natl Acad Sci}, \emph{114}(43),
+11374--79.
+
+Wellman, H.M. (2015). \emph{Making Minds: How Theory of Mind Develops}.
+New York, NY: Oxford University Press.
+
+Wierzbicka, A. (1994). Emotion, language, and cultural scripts. In
+\emph{Emotion and culture: Empirical studies of mutual influence}.
+(pp.~133--96).
+
+\setlength{\parindent}{-0.1in} \setlength{\leftskip}{0.125in} \noindent
+
+\end{document}
