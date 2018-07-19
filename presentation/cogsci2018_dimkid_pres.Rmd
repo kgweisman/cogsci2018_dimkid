@@ -1,0 +1,713 @@
+---
+title: "PRESENTATION Weisman, Dweck, & Markman (Cogsci 2018)"
+output: 
+  html_notebook:
+    toc: true
+    toc_float: true
+---
+
+This is an notebook containing code for generating plots for our talk at Cogsci 2018 (Madison, WI). The corresponding proceedings paper is [here](https://kgweisman.github.io/pub_files/Weisman,%20Dweck,%20&%20Markman%20(2018).pdf) in PDF form, and [here](https://github.com/kgweisman/cogsci2018_dimkid/tree/master/revision) in .Rmd form.
+
+```{r, include = F}
+knitr::opts_chunk$set(fig.width=3, fig.height=3, fig.crop = F, fig.pos = "tb", fig.path='figs/', echo=F, warning=F, cache=F, message=F, sanitize = T)
+```
+
+```{r libraries, include = F}
+# load required packages
+library(png)
+library(grid)
+library(xtable)
+library(tidyverse)
+library(lubridate)
+library(psych)
+library(rms)
+```
+
+```{r functions, include = F}
+# round to exactly 2 decimal places
+round2 <- function(x) {format(round(x, 2), nsmall = 2)}
+
+# determine how many factors meet custom retention criteria
+retain_nfactors <- function(df_efa, n_var = 20, 
+                       chosen_cor = "cor", chosen_rot = "oblimin") {
+  
+  # make function for determining max factors to extract (based on df)
+  max_fact_fun <- function(p) {
+    
+    s_moments <- function(p) {p*(p+1)/2}
+    param_est <- function(p, k) {p*k + p - (k*(k-1)/2)}
+    check_ok <- function(p, k) {
+      a <- (p-k)^2
+      b <- p+k
+      return(ifelse(a>b, TRUE, FALSE))
+    }
+    
+    df_check <- data.frame()
+    for(i in 1:p){
+      df_check[i,"check"] <- check_ok(p,i)
+    }
+    
+    max <- df_check %>% filter(check) %>% nrow()
+    return(max)
+    
+  }
+  
+  # do maximal efa
+  nfact_max <- max_fact_fun(n_var)
+  efa_max_unrot <- psych::fa(df_efa, nfactors = nfact_max, 
+                             cor = chosen_cor, rotate = "none")
+  
+  # keep factors with eigenvalues > 1, proportion var explained > 5%
+  nfact_keep_mid <- efa_max_unrot$Vaccounted %>%
+    t() %>%
+    data.frame() %>%
+    rownames_to_column("factor") %>%
+    filter(SS.loadings > 1, Proportion.Explained > 0.05) %>%
+    nrow()
+  
+  # do efa with nfact_keep_mid factors + rotation
+  efa_mid_rot <- psych::fa(df_efa, nfactors = nfact_keep_mid, 
+                           cor = chosen_cor, rotate = chosen_rot)
+  
+  # keep factors that are dominant for >= 1 item
+  nfact_keep_final <- efa_mid_rot$loadings[] %>%
+    data.frame() %>%
+    rownames_to_column("capacity") %>%
+    gather(factor, loading, -capacity) %>%
+    group_by(capacity) %>%
+    top_n(1, abs(loading)) %>%
+    ungroup() %>%
+    count(factor) %>%
+    nrow()
+  
+  return(nfact_keep_final)
+  
+}
+
+# print top n dominant items by factor
+top_n_domCap <- function(loadings_df, n, factor){
+  dom_df <- loadings_df %>%
+    full_join(d_all %>% distinct(capacity, capWording)) %>%
+    gather(factor, loading, -capacity, -capWording) %>%
+    group_by(capacity, capWording) %>%
+    top_n(1, abs(loading)) %>%
+    ungroup() %>%
+    group_by(factor) %>%
+    top_n(n, abs(loading))
+  
+  wordings <- dom_df$capWording[dom_df$factor == factor] %>% 
+    paste(collapse = ", ")
+  
+  return(wordings)
+  
+}
+```
+
+```{r choices, include = F}
+# what correlation to use
+chosen_cor <- "cor" # reported in paper
+# chosen_cor <- "poly" # alternative option
+
+# what rotation to use
+chosen_rot <- "oblimin" # reported in paper
+# chosen_rot <- "varimax" # alternative option
+
+# number of iterations for efa
+# n_iter <- 10
+n_iter <- 5000
+```
+
+```{r load data, include = F, warning = F}
+# older children (7-9y)
+d_raw_old <- read.csv("/Users/kweisman/Documents/Research (Stanford)/Projects/Dimkid/dimkid/data/children/run-02_2017-08-08_anonymized.csv") %>%
+  mutate(age_group = "children_79") %>%
+  select(-X, -trial.comments, -trialComments, -sessionComments)
+
+# younger children (4-6y)
+d_raw_young <- read.csv("/Users/kweisman/Documents/Research (Stanford)/Projects/Dimkid/dimkid/data/children/run-03_2017-08-21_anonymized.csv") %>%
+  mutate(age_group = "children_46") %>%
+  select(-X, -trial.comments, -trialComments, -sessionComments)
+
+d_raw <- d_raw_old %>% 
+  full_join(d_raw_young) %>%
+  mutate(dob = parse_datetime(dateOfBirth, "%m/%d/%y"),
+         dot = parse_datetime(gsub("2017", "17", dateOfTest), "%m/%d/%y"), 
+         age = interval(start = dob, end = dot) / 
+           duration(num = 1, units = "years")) %>%
+  select(-dateOfBirth, -dateOfTest, -dob, -dot)
+```
+
+```{r tidy data, include = F, warning = F}
+# implement filters
+d0 <- d_raw %>%
+  filter(trialNum <= 20) %>%
+  mutate(response = tolower(response),
+         age_group = ifelse(is.na(age), age_group, # re-sort as needed
+                            ifelse(age < 7, "children_46", "children_79"))) %>%
+  filter((age >= 4 & age < 10) | is.na(age), # outside of age range
+         (rt >= 250 | is.na(rt)), # fast RTs
+         response %in% c("no", "kinda", "yes")) # skipped trials
+
+# recode variables
+d1 <- d0 %>%
+  mutate(capWording = gsub(" $", "", capWording),
+         capWording = gsub(" -- ", "--", capWording),
+         capacity = recode(capWording,
+                           "be aware of things" = "awareness",
+                           "feel embarrassed" = "embarrassment",
+                           "feel guilty" = "guilt",
+                           "feel happy" = "happiness",
+                           "feel love" = "love",
+                           "feel pain" = "pain",
+                           "feel proud" = "pride",
+                           "feel sad" = "sadness",
+                           "feel scared" = "fear",
+                           "feel sick--like when you feel like you might throw up" = "nausea",
+                           "feel tired" = "fatigue",
+                           "figure out how to do things" = "figuring_out",
+                           "get angry" = "anger",
+                           "get hungry" = "hunger",
+                           "get hurt feelings" = "hurt_feelings",
+                           "make choices" = "choice",
+                           "remember things" = "memory",
+                           "sense temperatures" = "temperature",
+                           "sense whether something is close by or far away" = "depth",
+                           "smell things" = "smell"),
+         responseNum = recode(response, "no" = 0, "kinda" = 0.5, "yes" = 1),
+         character = factor(character,
+                            levels = c("elephant", "goat", "mouse", "bird",
+                                       "beetle", "teddy_bear", "doll",
+                                       "robot", "computer")),
+         testingSite = tolower(testingSite),
+         testingSiteType = recode(testingSite,
+                                  "bing" = "preschool",
+                                  "jmz" = "museum",
+                                  "tech" = "museum")) %>%
+  distinct()
+
+# separate by age group
+d_all <- d1
+d_old <- d1 %>% filter(age_group == "children_79")
+d_young <- d1 %>% filter(age_group == "children_46")
+
+# make wideform versions for EFA
+d_old_wide <- d_old %>%
+  distinct(subid, capacity, responseNum) %>%
+  spread(capacity, responseNum) %>%
+  remove_rownames() %>%
+  column_to_rownames("subid")
+
+d_young_wide <- d_young %>%
+  distinct(subid, capacity, responseNum) %>%
+  spread(capacity, responseNum) %>%
+  remove_rownames() %>%
+  column_to_rownames("subid")
+
+# rm(d_raw, d_raw_old, d_raw_young, d0, d1)
+```
+
+```{r participants, include = F}
+# n
+n_total <- data.frame(d_all %>% distinct(subid) %>% count())$n
+n_old <- data.frame(d_old %>% distinct(subid) %>% count())$n
+n_young <- data.frame(d_young %>% distinct(subid) %>% count())$n
+
+# age
+age_median_old <- median(d_old$age, na.rm = T)
+age_min_old <- min(d_old$age, na.rm = T)
+age_max_old <- max(d_old$age, na.rm = T)
+age_median_young <- median(d_young$age, na.rm = T)
+age_min_young <- min(d_young$age, na.rm = T)
+age_max_young <- max(d_young$age, na.rm = T)
+
+# study duration
+duration_median_old <- median(d_old$sessionDuration, na.rm = T)
+duration_median_young <- median(d_young$sessionDuration, na.rm = T)
+
+# site
+site_df <- d_all %>%
+  distinct(age_group, subid, testingSiteType) %>%
+  count(age_group, testingSiteType) %>%
+  group_by(age_group) %>%
+  mutate(prop = n/sum(n)) %>%
+  data.frame()
+
+# character
+character_df <- d_all %>%
+  distinct(age_group, subid, character) %>%
+  count(age_group, character) %>%
+  data.frame()
+
+# rt < 250ms
+rt_df <- d_raw %>%
+  distinct(age_group, subid, trialNum, rt) %>%
+  mutate(rt_fast = ifelse(is.na(rt), "ok", ifelse(rt < 250, "fast", "ok")),
+         rt_fast = factor(rt_fast, levels = c("ok", "fast"))) %>%
+  count(age_group, rt_fast) %>%
+  complete(rt_fast, nesting(age_group), fill = list(n = 0)) %>%
+  data.frame()
+
+# skipped trials
+skip_df <- d_all %>%
+  complete(capacity, nesting(subid, age_group), 
+           fill = list(response = "SKIP")) %>%
+  distinct(age_group, subid, capacity, response) %>%
+  mutate(response = factor(response,
+                           levels = c("no", "kinda", "yes", "SKIP"))) %>%
+  count(age_group, response) %>% 
+  group_by(age_group) %>%
+  mutate(prop = n/sum(n)) %>%
+  data.frame()
+```
+
+# EFA calculations
+
+## Older children (7-9y)
+
+```{r efa old}
+# determine how many factors to extract
+nfactors_old <- retain_nfactors(df_efa = d_old_wide)
+
+# alternative factor retention methods: uncomment to run
+# fa.parallel(d_old_wide, fa = "fa", n.iter = n_iter)
+# VSS(d_old_wide)
+
+# do EFA
+efa_old <- psych::fa(d_old_wide, nfactors = nfactors_old, n.iter = n_iter,
+                     cor = chosen_cor, rot = chosen_rot) %>% fa.sort()
+colnames(efa_old$loadings) <- paste("factor", 1:nfactors_old, sep = "")
+
+# get useful info from EFA
+efa_old_loadings <- efa_old$loadings[] %>% 
+  data.frame() %>%
+  rownames_to_column("capacity")
+
+efa_old_variance <- efa_old$Vaccounted %>% 
+  t() %>%
+  data.frame() %>%
+  mutate(factor = paste("factor", 1:nfactors_old, sep = ""))
+
+# efa_old_correlations <- efa_old$score.cor %>%
+#   data.frame() %>%
+#   rename(factor1 = X1, factor2 = X2, factor3 = X3) %>%
+#   mutate(factorA = paste("factor", 1:nfactors_old, sep = "")) %>%
+#   gather(factorB, cor, -factorA)
+
+efa_old
+```
+
+## Younger children (4-6y)
+
+```{r efa young}
+# determine how many factors to extract
+nfactors_young <- retain_nfactors(df_efa = d_young_wide)
+
+# alternative factor retention methods: uncomment to run
+# fa.parallel(d_young_wide, fa = "fa", n.iter = n_iter)
+# VSS(d_young_wide)
+
+# do EFA
+efa_young <- psych::fa(d_young_wide, nfactors = nfactors_young, n.iter = n_iter,
+                     cor = chosen_cor, rot = chosen_rot) %>% fa.sort()
+colnames(efa_young$loadings) <- paste("factor", 1:nfactors_young, sep = "")
+
+# get useful info from EFA
+efa_young_loadings <- efa_young$loadings[] %>% 
+  data.frame() %>%
+  rownames_to_column("capacity")
+
+efa_young_variance <- efa_young$Vaccounted %>% 
+  t() %>%
+  data.frame() %>%
+  mutate(factor = paste("factor", 1:nfactors_young, sep = ""))
+
+efa_young_correlations <- efa_young$score.cor %>%
+  data.frame()
+colnames(efa_young_correlations) <- paste("factor", 1:nfactors_young, sep = "")
+efa_young_correlations <- efa_young_correlations %>%
+  mutate(factorA = paste("factor", 1:nfactors_young, sep = "")) %>%
+  gather(factorB, cor, -factorA)
+
+# calculate congruence with older kids' factors
+efa_young_congruence <- factor.congruence(efa_old, efa_young) %>%
+  data.frame() %>%
+  rownames_to_column("old_factor") %>%
+  gather(young_factor, congruence, -old_factor)
+
+efa_young
+```
+
+```{r efa young force 2 factors}
+# do EFA, forcibly extracting 2 factors
+efa_young_force2 <- psych::fa(d_young_wide, nfactors = 2, n.iter = n_iter,
+                     cor = chosen_cor, rot = chosen_rot) %>% fa.sort()
+colnames(efa_young_force2$loadings) <- paste("factor", 1:2, sep = "")
+
+# get useful info from EFA
+efa_young_force2_loadings <- efa_young_force2$loadings[] %>% 
+  data.frame() %>%
+  rownames_to_column("capacity")
+
+efa_young_force2_variance <- efa_young_force2$Vaccounted %>% 
+  t() %>%
+  data.frame() %>%
+  mutate(factor = paste("factor", 1:2, sep = ""))
+
+efa_young_force2_correlations <- efa_young_force2$score.cor %>%
+  data.frame()
+colnames(efa_young_force2_correlations) <- paste("factor", 1:2, sep = "")
+efa_young_force2_correlations <- efa_young_force2_correlations %>%
+  mutate(factorA = paste("factor", 1:2, sep = "")) %>%
+  gather(factorB, cor, -factorA)
+
+# calculate congruence with older kids' factors
+efa_young_force2_congruence <- factor.congruence(efa_old, efa_young_force2) %>%
+  data.frame() %>%
+  rownames_to_column("old_factor") %>%
+  gather(young_force2_factor, congruence, -old_factor)
+
+efa_young_force2
+```
+
+```{r efa young force 1 factor}
+# do EFA, forcibly extracting 1 factor
+efa_young_force1 <- psych::fa(d_young_wide, nfactors = 1, n.iter = n_iter,
+                     cor = chosen_cor, rot = chosen_rot) %>% fa.sort()
+colnames(efa_young_force1$loadings) <- paste("factor", 1, sep = "")
+
+# get useful info from EFA
+efa_young_force1_loadings <- efa_young_force1$loadings[] %>% 
+  data.frame() %>%
+  rownames_to_column("capacity")
+
+efa_young_force1_variance <- efa_young_force1$Vaccounted %>% 
+  t() %>%
+  data.frame() %>%
+  mutate(factor = paste("factor", 1, sep = ""))
+
+# efa_young_force1_correlations <- efa_young_force1$score.cor %>%
+#   data.frame()
+# colnames(efa_young_force1_correlations) <- paste("factor", 1, sep = "")
+# efa_young_force1_correlations <- efa_young_force1_correlations %>%
+#   mutate(factorA = paste("factor", 1, sep = "")) %>%
+#   gather(factorB, cor, -factorA)
+
+# calculate congruence with older kids' factors
+efa_young_force1_congruence <- factor.congruence(efa_old, efa_young_force1) %>%
+  data.frame() %>%
+  rownames_to_column("old_factor") %>%
+  gather(young_force1_factor, congruence, -old_factor)
+
+efa_young_force1
+```
+
+# EFA plots
+
+```{r}
+order_old <- efa_old_loadings %>% 
+  gather(factor, loading, -capacity) %>% 
+  group_by(capacity) %>% 
+  top_n(1, abs(loading)) %>% 
+  ungroup() %>% 
+  rownames_to_column("order_old") %>% 
+  mutate(order_old = as.numeric(order_old)) %>%
+  select(capacity, order_old)
+
+order_young3 <- efa_young_loadings %>% 
+  gather(factor, loading, -capacity) %>% 
+  group_by(capacity) %>% 
+  top_n(1, abs(loading)) %>% 
+  ungroup() %>% 
+  rownames_to_column("order_young3") %>% 
+  mutate(order_young3 = as.numeric(order_young3)) %>%
+  select(capacity, order_young3)
+
+order_young2 <- efa_young_force2_loadings %>% 
+  gather(factor, loading, -capacity) %>% 
+  group_by(capacity) %>% 
+  top_n(1, abs(loading)) %>% 
+  ungroup() %>% 
+  rownames_to_column("order_young2") %>% 
+  mutate(order_young2 = as.numeric(order_young2)) %>%
+  select(capacity, order_young2)
+
+order_young1 <- efa_young_force1_loadings %>% 
+  gather(factor, loading, -capacity) %>% 
+  group_by(capacity) %>% 
+  top_n(1, abs(loading)) %>% 
+  ungroup() %>% 
+  rownames_to_column("order_young1") %>% 
+  mutate(order_young1 = as.numeric(order_young1)) %>%
+  select(capacity, order_young1)
+```
+
+```{r plot prep, include = F}
+figure1_df <- efa_old_loadings %>% 
+  rename(old_BODY = factor1, old_HEART = factor2, old_MIND = factor3) %>%
+  full_join(efa_young_loadings %>%
+              rename(young_BODY = factor1, young_HEART = factor2, 
+                     young_MIND = factor3)) %>%
+  full_join(efa_young_force2_loadings %>%
+              rename(forced1 = factor1, forced2 = factor2)) %>%
+  gather(factor, loading, -capacity) %>%
+  mutate(factor = factor(factor,
+                         levels = c("old_BODY", "old_HEART", "old_MIND",
+                                    "young_BODY", "young_HEART", "young_MIND",
+                                    "forced1", "forced2"),
+                         labels = c("7-9y\n3-factors:\nBODY", 
+                                    "7-9y\n3-factors:\nHEART", 
+                                    "7-9y\n3-factors:\nMIND", 
+                                    "4-6y\n3-factors:\nBODY",
+                                    "4-6y\n3-factors:\nHEART",
+                                    "4-6y\n3-factors:\nMIND",
+                                    "4-6y\n2-factors:\nBODY-HEART",
+                                    "4-6y\n2-factors:\nMIND"))) %>%
+  full_join(d_all %>% distinct(capacity, capWording)) %>%
+  # mutate(capWording = ifelse(grepl("feel sick", capWording), 
+  #                            "feel sick... throw up", capWording),
+  #        capWording = ifelse(grepl("far away", capWording), 
+  #                            "sense... far away", capWording),
+  #        capWording = ifelse(grepl("figure out", capWording), 
+  #                            "figure out...", capWording)) %>%
+  full_join(order_old) %>%
+  full_join(order_young3) %>%
+  full_join(order_young2) %>%
+  full_join(order_young1)
+
+var_df <- efa_old_variance %>% 
+  mutate(factor = recode(factor,
+                         "factor1" = "7-9y\n3-factors:\nBODY",
+                         "factor2" = "7-9y\n3-factors:\nHEART",
+                         "factor3" = "7-9y\n3-factors:\nMIND")) %>% 
+  full_join(efa_young_variance %>% 
+              mutate(factor = recode(factor,
+                                     "factor1" = "4-6y\n3-factors:\nBODY",
+                                     "factor2" = "4-6y\n3-factors:\nHEART",
+                                     "factor3" = "4-6y\n3-factors:\nMIND"))) %>% 
+  full_join(efa_young_force2_variance %>% 
+              mutate(factor = recode(factor,
+                                     "factor1" = "4-6y\n2-factors:\nBODY-HEART",
+                                     "factor2" = "4-6y\n2-factors:\nMIND")))
+```
+
+```{r efa_old plot, fig.width = 6, fig.asp = 0.8}
+figure1_df %>%
+  filter(grepl("7-9y\n3-factors", factor)) %>%
+  ggplot(aes(x = factor, y = reorder(capWording, desc(order_old)), fill = loading)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = round2(loading)), size = 5) +
+  annotate("rect", xmin = 0.5, xmax = 3.5, ymin = 0.5, ymax = 20.5,
+           color = "black", alpha = 0, size = 0.6) +
+  geom_text(data = var_df %>% filter(grepl("7-9y\n3-factors", factor)),
+            size = 6,
+            aes(x = factor, y = 0, fill = NULL,
+                label = paste0(round(Proportion.Explained, 2)*100, "%"))) +
+  scale_fill_distiller(palette = "RdYlBu", 
+                       limits = c(-1, 1), breaks = seq(-1, 1, 0.5),
+                       guide = guide_colorbar(title = element_blank(),
+                                              barheight = 30, barwidth = 1)) +
+  scale_x_discrete(position = "top") +
+  expand_limits(y = c(-1, 21)) +
+  theme_minimal() +
+  labs(x = "") +
+  theme(title = element_text(hjust = 0.5),
+        text = element_text(size = 24),
+        axis.text.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid = element_blank())
+```
+
+```{r efa_young3 plot, fig.width = 6, fig.asp = 0.8}
+figure1_df %>%
+  filter(grepl("4-6y\n3-factors", factor)) %>%
+  ggplot(aes(x = factor, y = reorder(capWording, desc(order_young3)), fill = loading)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = round2(loading)), size = 5) +
+  annotate("rect", xmin = 0.5, xmax = 3.5, ymin = 0.5, ymax = 20.5,
+           color = "black", alpha = 0, size = 0.6) +
+  geom_text(data = var_df %>% filter(grepl("4-6y\n3-factors", factor)),
+            size = 6,
+            aes(x = factor, y = 0, fill = NULL,
+                label = paste0(round(Proportion.Explained, 2)*100, "%"))) +
+  scale_fill_distiller(palette = "RdYlBu", 
+                       limits = c(-1, 1), breaks = seq(-1, 1, 0.5),
+                       guide = guide_colorbar(title = element_blank(),
+                                              barheight = 30, barwidth = 1)) +
+  scale_x_discrete(position = "top") +
+  expand_limits(y = c(-1, 21)) +
+  theme_minimal() +
+  labs(x = "") +
+  theme(title = element_text(hjust = 0.5),
+        text = element_text(size = 24),
+        axis.text.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid = element_blank())
+```
+
+```{r efa_young2 plot, fig.width = 6, fig.asp = 0.8}
+figure1_df %>%
+  filter(grepl("4-6y\n2-factors", factor)) %>%
+  ggplot(aes(x = factor, y = reorder(capWording, desc(order_young2)), fill = loading)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = round2(loading)), size = 5) +
+  annotate("rect", xmin = 0.5, xmax = 2.5, ymin = 0.5, ymax = 20.5,
+           color = "black", alpha = 0, size = 0.6) +
+  geom_text(data = var_df %>% filter(grepl("4-6y\n2-factors", factor)),
+            size = 6,
+            aes(x = factor, y = 0, fill = NULL,
+                label = paste0(round(Proportion.Explained, 2)*100, "%"))) +
+  scale_fill_distiller(palette = "RdYlBu", 
+                       limits = c(-1, 1), breaks = seq(-1, 1, 0.5),
+                       guide = guide_colorbar(title = element_blank(),
+                                              barheight = 30, barwidth = 1)) +
+  scale_x_discrete(position = "top") +
+  expand_limits(y = c(-1, 21)) +
+  theme_minimal() +
+  labs(x = "") +
+  theme(title = element_text(hjust = 0.5),
+        text = element_text(size = 24),
+        axis.text.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid = element_blank())
+```
+
+# Participant-level analyses
+
+```{r endorsements, include = F}
+df_factors <- efa_old_loadings %>%
+  gather(factor, loading, -capacity) %>%
+  group_by(capacity) %>%
+  top_n(1, abs(loading)) %>%
+  ungroup() %>%
+  group_by(factor) %>%
+  top_n(6, abs(loading)) %>%
+  ungroup() %>%
+  mutate(factor = recode(factor,
+                         "factor1" = "BODY",
+                         "factor2" = "HEART",
+                         "factor3" = "MIND"))
+
+df_endorsements <- d_all %>%
+  full_join(df_factors) %>%
+  filter(!is.na(factor)) %>%
+  group_by(age_group, subid, character, age, factor) %>%
+  mutate(endorse = recode(response,
+                          "no" = 0,
+                          "kinda" = 1,
+                          "yes" = 1)) %>%
+  summarise(total = sum(endorse, na.rm = T))
+
+df_endorsements_diff <- df_endorsements %>%
+  spread(factor, total) %>%
+  mutate(HEART_BODY = HEART - BODY,
+         MIND_BODY = MIND - BODY,
+         MIND_HEART = MIND - HEART) %>%
+  select(-c(BODY, HEART, MIND)) %>%
+  gather(comparison, diff, c(HEART_BODY, MIND_BODY, MIND_HEART)) %>%
+  mutate(comparison = factor(comparison,
+                             labels = c("BODY minus HEART",
+                                        "MIND minus BODY",
+                                        "MIND minus HEART")))
+```
+
+```{r table 1 prep}
+diff_tab <- df_endorsements_diff %>%
+  ungroup() %>%
+  # mutate(age_group = factor(age_group, labels = c("4-6y", "7-9y")),
+  #        comparison = gsub("minus", "-", comparison)) %>%
+  group_by(age_group, comparison) %>%
+  summarise(n = n(),
+            median = median(diff),
+            mean = mean(diff, na.rm = T),
+            variance = var(diff, na.rm = T),
+            skewness = psych::skew(diff),
+            kurtosis = psych::kurtosi(diff)) %>%
+  mutate_at(vars(mean, variance, skewness, kurtosis), funs(round2)) %>%
+  # mutate(comparison = factor(comparison,
+  #                            labels = c("BODY minus HEART", 
+  #                                       "BODY minus MIND", 
+  #                                       "MIND minus HEART"))) %>%
+  ungroup() %>% 
+  arrange(comparison, age_group) %>%
+  select(comparison, age_group, n, median, mean, variance, skewness, kurtosis) %>%
+  data.frame()
+```
+
+```{r Table 1 prep}
+# wilcoxon tests
+w1 <- wilcox.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "BODY minus HEART"))
+w2 <- wilcox.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "MIND minus BODY"))
+w3 <- wilcox.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "MIND minus HEART"))
+
+# welch's tests
+t1 <- t.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "BODY minus HEART"))
+t2 <- t.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "MIND minus BODY"))
+t3 <- t.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "MIND minus HEART"))
+
+# bartlett's tests
+ksq1 <- bartlett.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "BODY minus HEART"))
+ksq2 <- bartlett.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "MIND minus BODY"))
+ksq3 <- bartlett.test(diff ~ age_group, df_endorsements_diff %>% filter(comparison == "MIND minus HEART"))
+
+difftests_tab <- data.frame(group = c("B-H", "M-B", "M-H"),
+                            W = c(w1$statistic, w2$statistic, w3$statistic),
+                            Wp = c(w1$p.value, w2$p.value, w3$p.value),
+                            t = c(t1$statistic, t2$statistic, t3$statistic),
+                            tp = c(t1$p.value, t2$p.value, t3$p.value),
+                            K2 = c(ksq1$statistic, ksq2$statistic, 
+                                   ksq3$statistic),
+                            K2p = c(ksq1$p.value, ksq2$p.value, 
+                                    ksq3$p.value)) %>%
+  mutate_at(vars(-group), funs(round2))
+
+names(difftests_tab) <- c("", "W", "p", "t", "p", "K^2", "p")
+```
+
+```{r}
+df_endorsements_diff %>% 
+  group_by(comparison, age_group) %>% 
+  summarise(var = var(diff),
+            mean = mean(diff)) %>%
+  mutate_at(vars(var, mean), funs(. %>% round(2) %>% format(nmall = 2)))
+```
+
+
+```{r endorsements plot, fig.width = 6, fig.asp = 0.67}
+ggplot(df_endorsements_diff %>%
+         ungroup() %>%
+         mutate(age_group = factor(age_group,
+                                   levels = c("children_79", "children_46"),
+                                   labels = c("7-9y", "4-6y"))),
+       aes(x = diff, fill = age_group, color = age_group)) +
+  facet_grid(age_group ~ comparison) +
+  geom_bar(position = position_identity(), alpha = 0.5, size = 0.5) +
+  geom_vline(xintercept = 0, lty = 2) +
+  geom_text(data = diff_tab %>% 
+              mutate(age_group = factor(age_group,
+                                        levels = c("children_79", "children_46"),
+                                   labels = c("7-9y", "4-6y"))), 
+            aes(label = paste("M =", mean)),
+            x = -7, y = 42, hjust = 0, vjust = 0, size = 7) +
+  geom_text(data = diff_tab %>% 
+              mutate(age_group = factor(age_group,
+                                        levels = c("children_79", "children_46"),
+                                   labels = c("7-9y", "4-6y"))), 
+            aes(label = paste("s =", variance)),
+            x = 7, y = 42, hjust = 1, vjust = 0, size = 7) +
+  scale_x_continuous("Difference between categories", 
+                     limits = c(-7, 7), breaks = seq(-6, 6, 2)) +
+  scale_y_continuous("Number of participants", breaks = seq(0, 100, 10)) +
+  scale_fill_manual("Age group",
+                    values = c("#7fbf7b", "#af8dc3")) +
+  scale_color_manual("Age group", 
+                     values = c("#008837", "#7b3294")) +
+  theme_minimal() +
+  guides(fill = guide_legend(override.aes = list(alpha = 1)),
+         color = guide_legend(override.aes = list(size = 1))) +
+  theme(legend.position = "none",
+        text = element_text(size = 24),
+        panel.border = element_rect(fill = NA),
+        panel.grid.minor = element_blank())
+```
+
+
