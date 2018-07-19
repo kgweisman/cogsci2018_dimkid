@@ -21,6 +21,7 @@ library(tidyverse)
 library(lubridate)
 library(psych)
 library(rms)
+library(lme4)
 ```
 
 ```{r functions, include = F}
@@ -113,8 +114,8 @@ chosen_rot <- "oblimin" # reported in paper
 # chosen_rot <- "varimax" # alternative option
 
 # number of iterations for efa
-# n_iter <- 10
-n_iter <- 5000
+n_iter <- 10
+# n_iter <- 5000
 ```
 
 ```{r load data, include = F, warning = F}
@@ -264,7 +265,7 @@ skip_df <- d_all %>%
 
 ## Older children (7-9y)
 
-```{r efa old}
+```{r efa old, warnings = FALSE}
 # determine how many factors to extract
 nfactors_old <- retain_nfactors(df_efa = d_old_wide)
 
@@ -298,7 +299,7 @@ efa_old
 
 ## Younger children (4-6y)
 
-```{r efa young}
+```{r efa young, warnings = FALSE}
 # determine how many factors to extract
 nfactors_young <- retain_nfactors(df_efa = d_young_wide)
 
@@ -337,7 +338,7 @@ efa_young_congruence <- factor.congruence(efa_old, efa_young) %>%
 efa_young
 ```
 
-```{r efa young force 2 factors}
+```{r efa young force 2 factors, warnings = FALSE}
 # do EFA, forcibly extracting 2 factors
 efa_young_force2 <- psych::fa(d_young_wide, nfactors = 2, n.iter = n_iter,
                      cor = chosen_cor, rot = chosen_rot) %>% fa.sort()
@@ -369,7 +370,7 @@ efa_young_force2_congruence <- factor.congruence(efa_old, efa_young_force2) %>%
 efa_young_force2
 ```
 
-```{r efa young force 1 factor}
+```{r efa young force 1 factor, warnings = FALSE}
 # do EFA, forcibly extracting 1 factor
 efa_young_force1 <- psych::fa(d_young_wide, nfactors = 1, n.iter = n_iter,
                      cor = chosen_cor, rot = chosen_rot) %>% fa.sort()
@@ -607,8 +608,11 @@ df_endorsements_diff <- df_endorsements %>%
   mutate(comparison = factor(comparison,
                              labels = c("BODY minus HEART",
                                         "MIND minus BODY",
-                                        "MIND minus HEART")))
+                                        "MIND minus HEART")),
+         diff_abs = abs(diff))
 ```
+
+## Age group comparison
 
 ```{r table 1 prep}
 diff_tab <- df_endorsements_diff %>%
@@ -666,11 +670,10 @@ names(difftests_tab) <- c("", "W", "p", "t", "p", "K^2", "p")
 ```{r}
 df_endorsements_diff %>% 
   group_by(comparison, age_group) %>% 
-  summarise(var = var(diff),
-            mean = mean(diff)) %>%
+  summarise(mean = mean(diff),
+            var = var(diff)) %>%
   mutate_at(vars(var, mean), funs(. %>% round(2) %>% format(nmall = 2)))
 ```
-
 
 ```{r endorsements plot, fig.width = 6, fig.asp = 0.67}
 ggplot(df_endorsements_diff %>%
@@ -710,4 +713,160 @@ ggplot(df_endorsements_diff %>%
         panel.grid.minor = element_blank())
 ```
 
+## Thinking continuously
+
+```{r}
+contrasts(df_endorsements_diff$comparison) <- cbind(BH_GM = c(1, 0, -1),
+                                                    MB_GM = c(0, 1, -1))
+```
+
+```{r}
+r_raw_all <- lmer(diff ~ comparison * scale(age, scale = F) + (1|subid),
+                  df_endorsements_diff)
+summary(r_raw_all)
+
+r_raw_BH <- lm(diff ~ scale(age, scale = F),
+               df_endorsements_diff %>% filter(comparison == "BODY minus HEART"))
+summary(r_raw_BH)
+
+r_raw_MB <- lm(diff ~ scale(age, scale = F),
+               df_endorsements_diff %>% filter(comparison == "MIND minus BODY"))
+summary(r_raw_MB)
+
+r_raw_MH <- lm(diff ~ scale(age, scale = F),
+               df_endorsements_diff %>% filter(comparison == "MIND minus HEART"))
+summary(r_raw_MH)
+
+regressions_raw <- data.frame(summary(r_raw_BH)$coefficients) %>%
+  rownames_to_column("param") %>%
+  mutate(comparison = "BODY minus HEART") %>%
+  full_join(data.frame(summary(r_raw_MB)$coefficients) %>%
+              rownames_to_column("param") %>%
+              mutate(comparison = "MIND minus BODY")) %>%
+  full_join(data.frame(summary(r_raw_MH)$coefficients) %>%
+              rownames_to_column("param") %>%
+              mutate(comparison = "MIND minus HEART"))
+```
+
+```{r}
+r_abs_all <- lmer(diff_abs ~ comparison * scale(age, scale = F) + (1|subid),
+                  df_endorsements_diff)
+summary(r_abs_all)
+
+r_abs_BH <- lm(diff_abs ~ scale(age, scale = F),
+               df_endorsements_diff %>% filter(comparison == "BODY minus HEART"))
+summary(r_abs_BH)
+
+r_abs_MB <- lm(diff_abs ~ scale(age, scale = F),
+               df_endorsements_diff %>% filter(comparison == "MIND minus BODY"))
+summary(r_abs_MB)
+
+r_abs_MH <- lm(diff_abs ~ scale(age, scale = F),
+               df_endorsements_diff %>% filter(comparison == "MIND minus HEART"))
+summary(r_abs_MH)
+
+regressions_abs <- data.frame(summary(r_abs_BH)$coefficients) %>%
+  rownames_to_column("param") %>%
+  mutate(comparison = "BODY minus HEART") %>%
+  full_join(data.frame(summary(r_abs_MB)$coefficients) %>%
+              rownames_to_column("param") %>%
+              mutate(comparison = "MIND minus BODY")) %>%
+  full_join(data.frame(summary(r_abs_MH)$coefficients) %>%
+              rownames_to_column("param") %>%
+              mutate(comparison = "MIND minus HEART"))
+```
+
+```{r}
+regressions_all <- full_join(regressions_raw %>% 
+                               mutate(diff_type = "raw difference"),
+                             regressions_abs %>%
+                               mutate(diff_type = "absolute difference")) %>%
+  filter(param == "scale(age, scale = F)") %>%
+  select(-param) %>%
+  rename(b = Estimate,
+         b_se = Std..Error,
+         t = t.value,
+         p = Pr...t..) %>%
+  mutate_at(vars(b, b_se, t),
+            funs(. %>% round(2) %>% format(nsmall = 2))) %>%
+  mutate(p = ifelse(p < 0.001, "p < 0.001",
+                    paste0("p = ", format(round(p, 3), nsmall = 3))),
+         diff_type = factor(diff_type, 
+                            levels = c("raw difference", "absolute difference")))
+```
+
+```{r endorsements plot continuous, fig.width = 6, fig.asp = 0.75}
+ggplot(df_endorsements_diff %>%
+         ungroup() %>%
+         mutate(age_group = factor(age_group,
+                                   levels = c("children_79", "children_46"),
+                                   labels = c("7-9y", "4-6y"))) %>%
+         gather(diff_type, diff_deg, c(diff, diff_abs)) %>%
+         mutate(diff_type = factor(diff_type,
+                                   levels = c("diff", "diff_abs"),
+                                   labels = c("raw difference", "absolute difference"))),
+       aes(x = age, y = diff_deg, fill = age_group, color = age_group)) +
+  facet_grid(diff_type ~ comparison, scale = "free") +
+  geom_hline(yintercept = 0, lty = 2) +
+  geom_jitter(height = 0.25, width = 0) +
+  geom_smooth(aes(group = comparison), method = "lm",
+              color = "black", fill = "black", alpha = 0.25) +
+  geom_text(data = regressions_all,
+            aes(label = paste0("b = ", b, ", ", p), color = NA, fill = NA),
+            x = 4, y = 6, color = "black", hjust = 0, vjust = 1, size = 6) +
+  scale_x_continuous("Exact age in years", breaks = seq(0, 100, 1)) +
+  scale_y_continuous("Difference between categories",
+                     breaks = seq(-6, 6, 2)) +
+  scale_fill_manual("Age group",
+                    values = c("#7fbf7b", "#af8dc3")) +
+  scale_color_manual("Age group", 
+                     values = c("#008837", "#7b3294")) +
+  theme_minimal() +
+  guides(fill = guide_legend(override.aes = list(alpha = 1)),
+         color = guide_legend(override.aes = list(size = 1))) +
+  theme(legend.position = "none",
+        text = element_text(size = 24),
+        panel.border = element_rect(fill = NA),
+        panel.grid.minor = element_blank())  
+```
+
+# Supplemental slides
+
+```{r, fig.width = 4, fig.asp = 0.75}
+efa_old_loadings %>%
+  gather(factor, loading, -capacity) %>%
+  group_by(capacity) %>%
+  top_n(1, abs(loading)) %>%
+  ungroup() %>%
+  arrange(factor, desc(abs(loading))) %>%
+  rownames_to_column("order") %>%
+  mutate(order = as.numeric(order)) %>%
+  select(-loading) %>%
+  full_join(d_all) %>%
+  group_by(age_group, character, factor, capacity, order) %>%
+  do(data.frame(rbind(smean.cl.boot(.$responseNum)))) %>%
+  ungroup() %>%
+  mutate(character = factor(gsub("_", " ", character),
+                            levels = c("doll", "teddy bear", "robot", 
+                                       "computer", "beetle", "bird", 
+                                       "mouse", "goat", "elephant"))) %>%
+  ggplot(aes(y = Mean, x = reorder(gsub("_", " ", capacity), order),
+             color = factor, alpha = age_group, shape = age_group)) +
+  facet_wrap(~ character, ncol = 3) +
+  geom_pointrange(aes(ymin = Lower, ymax = Upper),
+                  position = position_dodge(width = 0.8)) +
+  scale_x_discrete("") +
+  scale_y_continuous("Mean response", 
+                     breaks = c(0, 0.5, 1), 
+                     labels = c("0 (no)", "0.5 (kinda)", "1 (yes)")) +
+  scale_color_brewer("Factor", palette = "Set1", 
+                     labels = c("BODY", "HEART", "MIND")) +
+  scale_alpha_discrete("Age group", range = c(1, 0.5),
+                       labels = c("4-6y", "7-9y")) +
+  scale_shape_discrete("Age group", labels = c("4-6y", "7-9y")) +
+  theme_minimal() +
+  theme(panel.border = element_rect(fill = NA),
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        legend.position = "bottom")
+```
 
