@@ -832,6 +832,217 @@ ggplot(df_endorsements_diff %>%
 
 # Supplemental slides
 
+## 3 age groups
+
+```{r}
+# split data
+d_terciles <- d_all %>%
+  filter(!is.na(age)) %>%
+  mutate(tercile = ntile(age, 3)) %>%
+  select(subid, age, tercile, capacity, responseNum) %>%
+  spread(capacity, responseNum)
+
+d_tercile_young <- d_terciles %>% 
+  filter(tercile == 1) %>%
+  column_to_rownames("subid") %>%
+  select(-tercile, -age)
+
+d_tercile_mid <- d_terciles %>% 
+  filter(tercile == 2) %>%
+  column_to_rownames("subid") %>%
+  select(-tercile, -age)
+
+d_tercile_old <- d_terciles %>% 
+  filter(tercile == 3) %>%
+  column_to_rownames("subid") %>%
+  select(-tercile, -age)
+```
+
+```{r}
+d_terciles %>% 
+  distinct(tercile, subid, age) %>% 
+  group_by(tercile) %>% 
+  summarise(n = n(),
+            min = min(age),
+            max = max(age),
+            mean = mean(age),
+            median = median(age))
+```
+
+
+```{r}
+# do EFAs
+efa_tercile_young <- psych::fa(d_tercile_young, nfactors = 3, #n.iter = n_iter,
+                               cor = chosen_cor, rot = chosen_rot) %>% fa.sort()
+efa_tercile_mid <- psych::fa(d_tercile_mid, nfactors = 3, #n.iter = n_iter,
+                             cor = chosen_cor, rot = chosen_rot) %>% fa.sort()
+efa_tercile_old <- psych::fa(d_tercile_old, nfactors = 3, #n.iter = n_iter,
+                             cor = chosen_cor, rot = chosen_rot) %>% fa.sort()
+
+order_tercile_young <- efa_tercile_young$loadings[] %>%
+  data.frame() %>%
+  rownames_to_column("capacity") %>%
+  gather(factor, loading, -capacity) %>%
+  group_by(capacity) %>%
+  top_n(1, abs(loading)) %>%
+  ungroup() %>%
+  arrange(factor, desc(abs(loading))) %>%
+  rownames_to_column("order_young") %>%
+  mutate(order_young = as.numeric(order_young)) %>%
+  select(order_young, capacity)
+
+order_tercile_mid <- efa_tercile_mid$loadings[] %>%
+  data.frame() %>%
+  rownames_to_column("capacity") %>%
+  gather(factor, loading, -capacity) %>%
+  group_by(capacity) %>%
+  top_n(1, abs(loading)) %>%
+  ungroup() %>%
+  arrange(factor, desc(abs(loading))) %>%
+  rownames_to_column("order_mid") %>%
+  mutate(order_mid = as.numeric(order_mid)) %>%
+  select(order_mid, capacity)
+
+order_tercile_old <- efa_tercile_old$loadings[] %>%
+  data.frame() %>%
+  rownames_to_column("capacity") %>%
+  gather(factor, loading, -capacity) %>%
+  group_by(capacity) %>%
+  top_n(1, abs(loading)) %>%
+  ungroup() %>%
+  arrange(factor, desc(abs(loading))) %>%
+  rownames_to_column("order_old") %>%
+  mutate(order_old = as.numeric(order_old)) %>%
+  select(order_old, capacity)
+
+efa_tercile_loadings <- efa_tercile_young$loadings[] %>%
+  data.frame() %>%
+  rownames_to_column("capacity") %>%
+  gather(factor, loading, -capacity) %>%
+  mutate(tercile = "young") %>%
+  full_join(efa_tercile_mid$loadings[] %>%
+              data.frame() %>%
+              rownames_to_column("capacity") %>%
+              gather(factor, loading, -capacity) %>%
+              mutate(tercile = "mid")) %>%
+  full_join(efa_tercile_old$loadings[] %>%
+              data.frame() %>%
+              rownames_to_column("capacity") %>%
+              gather(factor, loading, -capacity) %>%
+              mutate(tercile = "old")) %>%
+  full_join(order_tercile_young) %>%
+  full_join(order_tercile_mid) %>%
+  full_join(order_tercile_old) %>%
+  mutate(tercile = factor(tercile, levels = c("young", "mid", "old")))
+```
+
+```{r tercile_young plot, fig.width = 4, fig.asp = 1}
+ggplot(efa_tercile_loadings %>% filter(tercile == "young"),
+       aes(x = factor,
+           y = reorder(capacity, desc(order_young)),
+           fill = loading)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = round2(loading)), size = 5) +
+  annotate("rect", xmin = 0.5, xmax = 3.5, ymin = 0.5, ymax = 20.5,
+           color = "black", alpha = 0, size = 0.6) +
+  scale_fill_distiller(palette = "RdYlBu", 
+                       limits = c(-1, 1), breaks = seq(-1, 1, 0.5),
+                       guide = guide_colorbar(title = element_blank(),
+                                              barheight = 20, barwidth = 1)) +
+  scale_x_discrete(position = "top") +
+  # expand_limits(y = c(-1, 21)) +
+  theme_minimal() +
+  labs(x = "") +
+  theme(title = element_text(hjust = 0.5),
+        text = element_text(size = 24),
+        # axis.text.x = element_text(angle = 45, hjust = 0, vjust = 0),
+        axis.text.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid = element_blank())
+```
+
+```{r tercile_mid plot, fig.width = 4, fig.asp = 1}
+ggplot(efa_tercile_loadings %>% filter(tercile == "mid"),
+       aes(x = factor,
+           y = reorder(capacity, desc(order_mid)),
+           fill = loading)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = round2(loading)), size = 5) +
+  annotate("rect", xmin = 0.5, xmax = 3.5, ymin = 0.5, ymax = 20.5,
+           color = "black", alpha = 0, size = 0.6) +
+  scale_fill_distiller(palette = "RdYlBu", 
+                       limits = c(-1, 1), breaks = seq(-1, 1, 0.5),
+                       guide = guide_colorbar(title = element_blank(),
+                                              barheight = 20, barwidth = 1)) +
+  scale_x_discrete(position = "top") +
+  # expand_limits(y = c(-1, 21)) +
+  theme_minimal() +
+  labs(x = "") +
+  theme(title = element_text(hjust = 0.5),
+        text = element_text(size = 24),
+        # axis.text.x = element_text(angle = 45, hjust = 0, vjust = 0),
+        axis.text.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid = element_blank())
+```
+
+```{r tercile_old plot, fig.width = 4, fig.asp = 1}
+ggplot(efa_tercile_loadings %>% filter(tercile == "old"),
+       aes(x = factor,
+           y = reorder(capacity, desc(order_old)),
+           fill = loading)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = round2(loading)), size = 5) +
+  annotate("rect", xmin = 0.5, xmax = 3.5, ymin = 0.5, ymax = 20.5,
+           color = "black", alpha = 0, size = 0.6) +
+  scale_fill_distiller(palette = "RdYlBu", 
+                       limits = c(-1, 1), breaks = seq(-1, 1, 0.5),
+                       guide = guide_colorbar(title = element_blank(),
+                                              barheight = 20, barwidth = 1)) +
+  scale_x_discrete(position = "top") +
+  # expand_limits(y = c(-1, 21)) +
+  theme_minimal() +
+  labs(x = "") +
+  theme(title = element_text(hjust = 0.5),
+        text = element_text(size = 24),
+        # axis.text.x = element_text(angle = 45, hjust = 0, vjust = 0),
+        axis.text.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid = element_blank())
+```
+
+```{r tercile_all plot, fig.width = 8, fig.asp = 0.7}
+ggplot(efa_tercile_loadings,
+       aes(x = interaction(factor, tercile),
+           y = reorder(capacity, desc(order_old)),
+           fill = loading)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = round2(loading)), size = 5) +
+  annotate("rect", xmin = 0.5, xmax = 3.5, ymin = 0.5, ymax = 20.5,
+           color = "black", alpha = 0, size = 0.6) +
+  annotate("rect", xmin = 3.5, xmax = 6.5, ymin = 0.5, ymax = 20.5,
+           color = "black", alpha = 0, size = 0.6) +
+  annotate("rect", xmin = 6.5, xmax = 9.5, ymin = 0.5, ymax = 20.5,
+           color = "black", alpha = 0, size = 0.6) +
+  scale_fill_distiller(palette = "RdYlBu", 
+                       limits = c(-1, 1), breaks = seq(-1, 1, 0.5),
+                       guide = guide_colorbar(title = element_blank(),
+                                              barheight = 30, barwidth = 1)) +
+  scale_x_discrete(position = "top") +
+  # expand_limits(y = c(-1, 21)) +
+  theme_minimal() +
+  labs(x = "") +
+  theme(title = element_text(hjust = 0.5),
+        text = element_text(size = 24),
+        # axis.text.x = element_text(angle = 45, hjust = 0, vjust = 0),
+        axis.text.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid = element_blank())
+```
+
+
+## Attributions
+
 ```{r, fig.width = 4, fig.asp = 0.75}
 efa_old_loadings %>%
   gather(factor, loading, -capacity) %>%
